@@ -262,32 +262,6 @@ function currentIndex() {
   return ((Math.round(smooth / VH) % n) + n) % n;
 }
 
-// animate the page scroll to a given Y (used by the project nav)
-let scrollAnim = null;
-function animateScrollTo(targetY, ms, done) {
-  const from = window.scrollY, t0 = performance.now();
-  scrollAnim = (now) => {
-    const k = Math.min(1, (now - t0) / ms);
-    const e = 1 - Math.pow(1 - k, 3); // cubicOut
-    window.scrollTo(0, from + (targetY - from) * e);
-    if (k >= 1) { scrollAnim = null; done && done(); }
-  };
-}
-
-function scrollToIndex(i, done) {
-  const cyc = cycleH();
-  const pos = ((window.scrollY % cyc) + cyc) % cyc;
-  let d = i * VH - pos;
-  d = ((d % cyc) + cyc * 1.5) % cyc - cyc / 2;   // nearest wrapped copy
-  if (Math.abs(d) < 2) { done && done(); return; }
-  // rAF is paused in hidden tabs — jump instead of stalling the open
-  if (document.hidden) {
-    window.scrollTo(0, window.scrollY + d);
-    done && done();
-    return;
-  }
-  animateScrollTo(window.scrollY + d, 700, done);
-}
 
 /* ── auto-scroll: drift on load, yield to the visitor, resume on idle ── */
 const auto = { active: false, acc: 0, idleTimer: null };
@@ -354,18 +328,29 @@ soundBtn.addEventListener('click', () => {
 const navBtns = PROJECTS.map((p, i) => {
   const b = document.createElement('button');
   b.textContent = p.client;
-  b.addEventListener('click', () => {
-    if (detailOpen && i === detailIdx) return;
-    stopAuto(false);
-    scrollToIndex(i, () => openDetail(i));
-  });
+  b.addEventListener('click', () => openProject(i));
   navEl.appendChild(b);
   return b;
 });
 
+/* route transitions fade through black (the original site's pattern):
+   fade out → swap the world while invisible → fade back in. */
+let transitioning = false;
+function fadeSwap(swapFn, fadeOut = 220, fadeIn = 700) {
+  if (transitioning) return;
+  transitioning = true;
+  tween('opacity', 0, fadeOut);
+  setTimeout(() => {
+    swapFn();
+    tween('opacity', 1, fadeIn);
+    setTimeout(() => { transitioning = false; }, fadeIn);
+  }, fadeOut + 30);
+}
+
 let homeScrollY = 0;
 
-function openDetail(i) {
+// swap to project i's gallery — runs at black, so everything is instant
+function mountGallery(i) {
   detailOpen = true;
   detailIdx = i;
   const p = PROJECTS[i];
@@ -374,36 +359,47 @@ function openDetail(i) {
   descEl.textContent = p.description || '';
   detailEl.hidden = false;
 
-  // swap the home track for this project's gallery scroll.
-  // gallery[0] is the cover, so the cut is seamless.
   const g = buildGallery(i);
   slides.forEach(s => s.mesh.visible = false);
   Object.values(galleries).forEach(gg => gg.items.forEach(it => it.mesh.visible = false));
   g.items.forEach(it => it.mesh.visible = true);
 
-  homeScrollY = window.scrollY;
+  // closing later returns home AT this project
+  homeScrollY = Math.floor(LOOPS / 2) * cycleH() + i * VH;
   spacer.style.height = (g.items.length * VH) + 'px';
   window.scrollTo(0, 0);
   smooth = 0; lastSmooth = 0; scrollDif = 0;
 
+  // lens off instantly — we're at black, no need to animate it
+  delete tweens.displacement;
+  state.displacement = 0;
+  ui.lens = false;
+  lensBtn.textContent = 'Lens: off';
+}
+
+function openProject(i) {
+  if (transitioning) return;
+  if (detailOpen && i === detailIdx) return;
   stopAuto(false);
-  setLens(false);            // lens collapses flat, original route behavior
+  fadeSwap(() => mountGallery(i));
 }
 
 function closeDetail() {
-  detailOpen = false;
-  detailIdx = -1;
-  detailEl.hidden = true;
+  if (transitioning || !detailOpen) return;
+  fadeSwap(() => {
+    detailOpen = false;
+    detailIdx = -1;
+    detailEl.hidden = true;
 
-  // restore the home track exactly where it was left
-  Object.values(galleries).forEach(gg => gg.items.forEach(it => it.mesh.visible = false));
-  slides.forEach(s => s.mesh.visible = true);
-  spacer.style.height = (LOOPS * cycleH()) + 'px';
-  window.scrollTo(0, homeScrollY);
-  smooth = homeScrollY; lastSmooth = homeScrollY; scrollDif = 0;
+    Object.values(galleries).forEach(gg => gg.items.forEach(it => it.mesh.visible = false));
+    slides.forEach(s => s.mesh.visible = true);
+    spacer.style.height = (LOOPS * cycleH()) + 'px';
+    window.scrollTo(0, homeScrollY);
+    smooth = homeScrollY; lastSmooth = homeScrollY; scrollDif = 0;
 
-  setLens(true);             // lens back over 2s
-  stopAuto(true);            // schedules the idle resume
+    setLens(true);           // lens blooms back during the fade-in
+    stopAuto(true);          // schedules the idle resume
+  }, 220, 900);
 }
 
 detailX.addEventListener('click', closeDetail);
@@ -468,9 +464,10 @@ window.__setParam = (key, v) => {
   const u = materials[activeEffect].uniforms;
   if (u[key]) u[key].value = v;
 };
-window.__openDetail = (i) => { stopAuto(false); scrollToIndex(i, () => openDetail(i)); };
+window.__openDetail = openProject;
 window.__closeDetail = closeDetail;
 window.__audio = audio;
+window.__state = state;
 
 /* ── render loop ───────────────────────────────────────────────────── */
 const start = performance.now();
@@ -482,7 +479,6 @@ function frame(now) {
   for (const k of Object.keys(tweens)) {
     if (!tweens[k](now)) delete tweens[k];
   }
-  if (scrollAnim) scrollAnim(now);
 
   // auto-scroll: accumulate fractional pixels so slow speeds stay smooth
   if (auto.active) {
