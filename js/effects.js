@@ -6,6 +6,13 @@
 // `vec4 outColor`, list its params. It shows up in the G panel
 // automatically, with sliders.
 //
+// HOUSE RULE — the "safe area": distortion lives at the top and
+// bottom of the viewport; the middle of the page stays readable
+// (this is what makes Lens Tunnel work). Every effect except
+// lens-tunnel (whose geometry does this naturally) gets the shared
+// `edgeMask()` helper and a Safe-area slider: 0 at the center band,
+// ramping to 1 at the top/bottom edges. Multiply your warp by it.
+//
 // Shared uniforms every effect gets:
 //   tex1         — the scene render target
 //   time         — elapsed ms
@@ -34,6 +41,17 @@ const HEADER = /* glsl */`
   uniform float scrollDif;
 `;
 
+// safe-area helper: 0 in the middle band, 1 at top/bottom edges
+const SAFE = /* glsl */`
+  uniform float safeArea;
+  float edgeMask(vec2 uv) {
+    float d = abs(uv.y - 0.5) * 2.0;   // 0 center → 1 top/bottom edge
+    return smoothstep(safeArea, min(safeArea + 0.5, 1.0), d);
+  }
+`;
+const SAFE_PARAM =
+  { key: 'safeArea', label: 'Safe area', value: 0.35, min: 0, max: 0.9, step: 0.01 };
+
 // shared tail: saturation dim + transition fade, applied to `outColor`
 const FINISH = /* glsl */`
     float avg = (outColor.r + outColor.g + outColor.b) / 3.0;
@@ -45,7 +63,8 @@ const FINISH = /* glsl */`
 
 export const EFFECTS = {
 
-  /* ── 1. The recovered original: radial magnification + scroll smear ── */
+  /* ── 1. The recovered original: radial magnification + scroll smear.
+         Its geometry IS the safe area — center reads, edges tunnel. ── */
   'lens-tunnel': {
     name: 'Lens Tunnel (original)',
     params: [
@@ -79,27 +98,111 @@ export const EFFECTS = {
     `,
   },
 
-  /* ── 2. Radial chromatic split + ghost echoes, driven by velocity ── */
+  /* ── 2. Horizon Roll: top and bottom roll away like a drum seen
+         face-on — compression + pinch + shading on the curve.
+         Scroll velocity tips the drum. ── */
+  'horizon-roll': {
+    name: 'Horizon Roll',
+    params: [
+      { key: 'rollCurve',  label: 'Curve',  value: 1.0, min: 0.2, max: 2, step: 0.05 },
+      { key: 'pinch',      label: 'Pinch',  value: 0.6, min: 0,   max: 2, step: 0.05 },
+      { key: 'rollShade',  label: 'Shade',  value: 0.5, min: 0,   max: 1, step: 0.01 },
+      SAFE_PARAM,
+    ],
+    frag: HEADER + SAFE + /* glsl */`
+      uniform float rollCurve;
+      uniform float pinch;
+      uniform float rollShade;
+
+      void main() {
+        float m = edgeMask(vUv) * displacement;
+
+        float cy = (vUv.y - 0.5) * 2.0;                      // -1..1
+        float theta = cy * 1.5708 * rollCurve
+                    + scrollDif * 0.001;                     // velocity tips it
+
+        // cylinder mapping: identity near center, compressed at edges
+        float yS = 0.5 + sin(theta) / (3.1416 * max(rollCurve, 0.001));
+        float nY = mix(vUv.y, yS, m);
+
+        // the curve bulges x outward as it rolls back
+        float nX = 0.5 + (vUv.x - 0.5) * (1.0 + (1.0 - cos(theta)) * pinch * m);
+
+        vec4 outColor = texture2D(tex1, vec2(nX, nY));
+
+        // shade the rolled-away surface
+        outColor.rgb *= 1.0 - (1.0 - cos(theta)) * rollShade * m;
+        ${FINISH}
+      }
+    `,
+  },
+
+  /* ── 3. Depth Smear: edges streak toward the vanishing point,
+         multi-tap trails pumped by scroll velocity. ── */
+  'depth-smear': {
+    name: 'Depth Smear',
+    params: [
+      { key: 'smearLen', label: 'Length',      value: 1.0, min: 0, max: 3, step: 0.05 },
+      { key: 'velBoost', label: 'Scroll pump', value: 1.0, min: 0, max: 3, step: 0.05 },
+      { key: 'chroma',   label: 'Chroma',      value: 0.5, min: 0, max: 2, step: 0.05 },
+      SAFE_PARAM,
+    ],
+    frag: HEADER + SAFE + /* glsl */`
+      uniform float smearLen;
+      uniform float velBoost;
+      uniform float chroma;
+
+      void main() {
+        float m = edgeMask(vUv) * displacement;
+        float vel = clamp(abs(scrollDif), 0.0, 40.0);
+
+        // streak direction: toward the center of the frame
+        vec2 dir = vec2(0.5) - vUv;
+        float len = (0.04 * smearLen + vel * 0.003 * velBoost) * m;
+
+        vec4 acc = vec4(0.0);
+        float w = 1.0, wsum = 0.0;
+        for (int i = 0; i < 8; i++) {
+          float t = float(i) / 7.0;
+          acc += texture2D(tex1, vUv + dir * len * t) * w;
+          wsum += w;
+          w *= 0.82;
+        }
+        vec4 outColor = acc / wsum;
+
+        // chromatic fringing on the trails
+        outColor.r = mix(outColor.r,
+          texture2D(tex1, vUv + dir * len * 1.25).r, chroma * m * 0.6);
+        outColor.b = mix(outColor.b,
+          texture2D(tex1, vUv + dir * len * 0.75).b, chroma * m * 0.6);
+        ${FINISH}
+      }
+    `,
+  },
+
+  /* ── 4. Radial chromatic split + ghost echoes, edge-masked ── */
   'rgb-echo': {
     name: 'RGB Echo',
     params: [
       { key: 'aberration', label: 'Aberration',  value: 1.2,  min: 0,   max: 4,   step: 0.05 },
       { key: 'echoSpread', label: 'Echo spread', value: 1.0,  min: 0,   max: 3,   step: 0.05 },
       { key: 'echoDecay',  label: 'Echo decay',  value: 0.55, min: 0.2, max: 0.9, step: 0.01 },
+      SAFE_PARAM,
     ],
-    frag: HEADER + /* glsl */`
+    frag: HEADER + SAFE + /* glsl */`
       uniform float aberration;
       uniform float echoSpread;
       uniform float echoDecay;
 
       void main() {
+        float m = edgeMask(vUv) * displacement;
         vec2 dir = vUv - vec2(0.5);
         float vel = clamp(abs(scrollDif), 0.0, 40.0);
 
-        float amt = (0.004 + vel * 0.0006) * aberration * displacement;
+        float amt = (0.004 + vel * 0.0006) * aberration * m;
         vec4 outColor = vec4(
           texture2D(tex1, vUv - dir * amt      ).r,
-          texture2D(tex1, vUv - dir * amt * 2.0).g,
+          texture2D(tex1, vUv).g,
           texture2D(tex1, vUv - dir * amt * 3.0).b,
           1.0
         );
@@ -108,7 +211,7 @@ export const EFFECTS = {
         float w = 1.0, wsum = 1.0;
         for (int i = 1; i <= 5; i++) {
           w *= echoDecay;
-          vec2 off = dir * float(i) * (0.006 + vel * 0.0009) * echoSpread * displacement;
+          vec2 off = dir * float(i) * (0.006 + vel * 0.0009) * echoSpread * m;
           outColor.rgb += texture2D(tex1, vUv - off).rgb * w;
           wsum += w;
         }
@@ -118,20 +221,23 @@ export const EFFECTS = {
     `,
   },
 
-  /* ── 3. Mirror-segment kaleidoscope; scroll twists the wheel ── */
+  /* ── 5. Mirror-segment kaleidoscope at the edges; middle stays real ── */
   'kaleido': {
     name: 'Kaleido',
     params: [
-      { key: 'segments', label: 'Segments', value: 6,   min: 2, max: 16, step: 1    },
-      { key: 'twist',    label: 'Twist',    value: 1.0, min: 0, max: 4,  step: 0.05 },
+      { key: 'segments', label: 'Segments', value: 6,   min: 2,   max: 16,  step: 1    },
+      { key: 'twist',    label: 'Twist',    value: 1.0, min: 0,   max: 4,   step: 0.05 },
       { key: 'kZoom',    label: 'Zoom',     value: 1.0, min: 0.5, max: 2.5, step: 0.05 },
+      SAFE_PARAM,
     ],
-    frag: HEADER + /* glsl */`
+    frag: HEADER + SAFE + /* glsl */`
       uniform float segments;
       uniform float twist;
       uniform float kZoom;
 
       void main() {
+        float m = edgeMask(vUv) * displacement;
+
         vec2 c = vUv - vec2(0.5);
         float a = atan(c.y, c.x);
         float r = length(c);
@@ -142,81 +248,34 @@ export const EFFECTS = {
         a = abs(a - seg * 0.5);
 
         vec2 k = vec2(cos(a), sin(a)) * r / kZoom;
-        vec2 nVuv = mix(vUv, k + vec2(0.5), displacement);
+        vec2 nVuv = mix(vUv, k + vec2(0.5), m);
         vec4 outColor = texture2D(tex1, nVuv);
         ${FINISH}
       }
     `,
   },
 
-  /* ── 4. Liquid: perlin flow warp (the perlin from the original
-         site's own shader source); scroll stirs the ink ── */
-  'liquid': {
-    name: 'Liquid',
-    params: [
-      { key: 'flowScale', label: 'Scale',  value: 3.0, min: 0.5, max: 12, step: 0.1  },
-      { key: 'flowAmp',   label: 'Amount', value: 1.0, min: 0,   max: 4,  step: 0.05 },
-      { key: 'flowSpeed', label: 'Speed',  value: 1.0, min: 0,   max: 4,  step: 0.05 },
-    ],
-    frag: HEADER + /* glsl */`
-      uniform float flowScale;
-      uniform float flowAmp;
-      uniform float flowSpeed;
-
-      vec3 random_perlin(vec3 p) {
-        p = vec3(
-          dot(p, vec3(127.1, 311.7, 69.5)),
-          dot(p, vec3(269.5, 183.3, 132.7)),
-          dot(p, vec3(247.3, 108.5, 96.5)));
-        return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
-      }
-      float noise_perlin(vec3 p) {
-        vec3 i = floor(p);
-        vec3 s = fract(p);
-        float a = dot(random_perlin(i), s);
-        float b = dot(random_perlin(i + vec3(1, 0, 0)), s - vec3(1, 0, 0));
-        float c = dot(random_perlin(i + vec3(0, 1, 0)), s - vec3(0, 1, 0));
-        float d = dot(random_perlin(i + vec3(0, 0, 1)), s - vec3(0, 0, 1));
-        float e = dot(random_perlin(i + vec3(1, 1, 0)), s - vec3(1, 1, 0));
-        float f = dot(random_perlin(i + vec3(1, 0, 1)), s - vec3(1, 0, 1));
-        float g = dot(random_perlin(i + vec3(0, 1, 1)), s - vec3(0, 1, 1));
-        float h = dot(random_perlin(i + vec3(1, 1, 1)), s - vec3(1, 1, 1));
-        vec3 u = smoothstep(0., 1., s);
-        return mix(mix(mix(a, b, u.x), mix(c, e, u.x), u.y),
-                   mix(mix(d, f, u.x), mix(g, h, u.x), u.y), u.z);
-      }
-
-      void main() {
-        float t = time * 0.0002 * flowSpeed;
-        float n1 = noise_perlin(vec3(vUv * flowScale, t));
-        float n2 = noise_perlin(vec3(vUv * flowScale + 7.31, t * 1.3));
-
-        float amp = (flowAmp * 0.02 + abs(scrollDif) * 0.0015) * displacement;
-        vec2 nVuv = vUv + vec2(n1, n2) * amp;
-        vec4 outColor = texture2D(tex1, nVuv);
-        ${FINISH}
-      }
-    `,
-  },
-
-  /* ── 5. Slit-scan: horizontal bands shear sideways, editorial cut ── */
+  /* ── 6. Slit-scan: bands shear sideways at the edges only ── */
   'slitscan': {
     name: 'Slit-Scan',
     params: [
-      { key: 'bands',    label: 'Bands',     value: 24,  min: 4, max: 120, step: 1    },
-      { key: 'shear',    label: 'Shear',     value: 1.0, min: 0, max: 4,   step: 0.05 },
-      { key: 'bandFreq', label: 'Band freq', value: 3.0, min: 0.5, max: 12, step: 0.1 },
+      { key: 'bands',    label: 'Bands',     value: 24,  min: 4,   max: 120, step: 1    },
+      { key: 'shear',    label: 'Shear',     value: 1.0, min: 0,   max: 4,   step: 0.05 },
+      { key: 'bandFreq', label: 'Band freq', value: 3.0, min: 0.5, max: 12,  step: 0.1  },
+      SAFE_PARAM,
     ],
-    frag: HEADER + /* glsl */`
+    frag: HEADER + SAFE + /* glsl */`
       uniform float bands;
       uniform float shear;
       uniform float bandFreq;
 
       void main() {
+        float m = edgeMask(vUv) * displacement;
+
         float band = floor(vUv.y * bands) / bands;
         float off = sin(band * 6.28318 * bandFreq + time * 0.001)
                   * (0.01 * shear + scrollDif * 0.0015 * shear)
-                  * displacement;
+                  * m;
         vec2 nVuv = vec2(vUv.x + off, vUv.y);
         vec4 outColor = texture2D(tex1, nVuv);
         ${FINISH}
@@ -224,27 +283,29 @@ export const EFFECTS = {
     `,
   },
 
-  /* ── 6. Mosaic: pixelation that chunks up as you scroll faster ── */
+  /* ── 7. Mosaic: edges pixelate (chunkier when scrolling), middle clean ── */
   'mosaic': {
     name: 'Mosaic',
     params: [
       { key: 'cellBase', label: 'Cells',       value: 80,  min: 8, max: 200, step: 1    },
       { key: 'velPump',  label: 'Scroll pump', value: 1.0, min: 0, max: 3,   step: 0.05 },
       { key: 'rgbSplit', label: 'RGB split',   value: 0.5, min: 0, max: 3,   step: 0.05 },
+      SAFE_PARAM,
     ],
-    frag: HEADER + /* glsl */`
+    frag: HEADER + SAFE + /* glsl */`
       uniform float cellBase;
       uniform float velPump;
       uniform float rgbSplit;
 
       void main() {
+        float m = edgeMask(vUv) * displacement;
         float vel = clamp(abs(scrollDif), 0.0, 40.0);
         float cells = max(cellBase - vel * velPump * 1.5, 4.0);
 
         vec2 cUv = (floor(vUv * cells) + 0.5) / cells;
-        vec2 nVuv = mix(vUv, cUv, displacement);
+        vec2 nVuv = mix(vUv, cUv, m);
 
-        vec2 split = vec2(rgbSplit * 0.003 * displacement, 0.0);
+        vec2 split = vec2(rgbSplit * 0.003 * m, 0.0);
         vec4 outColor = vec4(
           texture2D(tex1, nVuv + split).r,
           texture2D(tex1, nVuv).g,
@@ -256,105 +317,28 @@ export const EFFECTS = {
     `,
   },
 
-  /* ── 7. VHS: scanlines + row-glitch bursts fed by velocity ── */
-  'vhs': {
-    name: 'VHS',
-    params: [
-      { key: 'glitchAmt',   label: 'Glitch',    value: 1.0,  min: 0,  max: 4,   step: 0.05 },
-      { key: 'lineDensity', label: 'Scanlines', value: 200,  min: 40, max: 600, step: 5    },
-      { key: 'noiseAmt',    label: 'Noise',     value: 0.15, min: 0,  max: 0.6, step: 0.01 },
-    ],
-    frag: HEADER + /* glsl */`
-      uniform float glitchAmt;
-      uniform float lineDensity;
-      uniform float noiseAmt;
-
-      float hash(vec2 p) {
-        return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453123);
-      }
-
-      void main() {
-        float vel = clamp(abs(scrollDif), 0.0, 40.0);
-
-        // row displacement bursts — more rows jump when scrolling fast
-        float row = floor(vUv.y * lineDensity);
-        float h = hash(vec2(row, floor(time * 0.01)));
-        float burst = step(1.0 - 0.02 * glitchAmt - vel * 0.002 * glitchAmt, h);
-        float off = (h - 0.5) * burst * (0.05 + vel * 0.002) * glitchAmt * displacement;
-
-        vec2 nVuv = vec2(vUv.x + off, vUv.y);
-
-        float ca = (0.0015 + vel * 0.0002) * glitchAmt * displacement;
-        vec4 outColor = vec4(
-          texture2D(tex1, nVuv + vec2(ca, 0.0)).r,
-          texture2D(tex1, nVuv).g,
-          texture2D(tex1, nVuv - vec2(ca, 0.0)).b,
-          1.0
-        );
-
-        float scan = 1.0 - (0.5 + 0.5 * sin(vUv.y * lineDensity * 6.28318))
-                          * 0.12 * displacement;
-        float n = (hash(vUv * vec2(1920.0, 1080.0) + fract(time * 0.001)) - 0.5)
-                * noiseAmt * displacement;
-        outColor.rgb = outColor.rgb * scan + n;
-        ${FINISH}
-      }
-    `,
-  },
-
-  /* ── 8. Spiral zoom: multi-tap fake feedback, scroll winds the spiral ── */
-  'spiralzoom': {
-    name: 'Spiral Zoom',
-    params: [
-      { key: 'taps',      label: 'Taps',       value: 6,    min: 2, max: 8,    step: 1     },
-      { key: 'scaleStep', label: 'Zoom step',  value: 0.08, min: 0, max: 0.2,  step: 0.005 },
-      { key: 'rotStep',   label: 'Twist step', value: 0.05, min: 0, max: 0.4,  step: 0.005 },
-    ],
-    frag: HEADER + /* glsl */`
-      uniform float taps;
-      uniform float scaleStep;
-      uniform float rotStep;
-
-      void main() {
-        vec2 c = vUv - vec2(0.5);
-        float vel = scrollDif * 0.002;
-
-        vec4 acc = vec4(0.0);
-        float wsum = 0.0, w = 1.0;
-        for (int i = 0; i < 8; i++) {
-          if (float(i) >= taps) break;
-          float s = 1.0 - float(i) * scaleStep * displacement;
-          float a = float(i) * (rotStep + vel) * displacement;
-          mat2 R = mat2(cos(a), -sin(a), sin(a), cos(a));
-          acc += texture2D(tex1, R * (c * s) + vec2(0.5)) * w;
-          wsum += w;
-          w *= 0.8;
-        }
-        vec4 outColor = acc / wsum;
-        ${FINISH}
-      }
-    `,
-  },
-
-  /* ── 9. Concentric ripple from center, breathing + velocity-pumped ── */
+  /* ── 8. Concentric ripple, edge-masked + velocity-pumped ── */
   'ripple': {
     name: 'Ripple',
     params: [
       { key: 'rippleFreq',  label: 'Frequency', value: 28,  min: 2, max: 80, step: 1    },
       { key: 'rippleAmp',   label: 'Amplitude', value: 1.2, min: 0, max: 5,  step: 0.05 },
       { key: 'rippleSpeed', label: 'Speed',     value: 1.0, min: 0, max: 4,  step: 0.05 },
+      SAFE_PARAM,
     ],
-    frag: HEADER + /* glsl */`
+    frag: HEADER + SAFE + /* glsl */`
       uniform float rippleFreq;
       uniform float rippleAmp;
       uniform float rippleSpeed;
 
       void main() {
+        float m = edgeMask(vUv) * displacement;
+
         vec2 cUv = vUv - vec2(0.5);
         float d = length(cUv);
         vec2 dirn = cUv / max(d, 0.0001);
 
-        float amp = (rippleAmp * 0.004 + abs(scrollDif) * 0.0004 * rippleAmp) * displacement;
+        float amp = (rippleAmp * 0.004 + abs(scrollDif) * 0.0004 * rippleAmp) * m;
         float wave = sin(d * rippleFreq * 6.2831 - time * 0.002 * rippleSpeed * 6.2831);
 
         vec2 nVuv = vUv + dirn * wave * amp;

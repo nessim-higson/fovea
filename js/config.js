@@ -26,5 +26,5 @@ export const SETTINGS = {
 
   autoScroll: true,      // drift through projects on load
   autoSpeed: 60,         // px/second
-  autoResume: 8,         // resume after N idle seconds (0 = never)
+  autoResume: 2,         // resume after N idle seconds (0 = never)
 };
