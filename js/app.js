@@ -15,6 +15,7 @@ import GUI from 'lil-gui';
 import { SITE, PROJECTS, SETTINGS } from './config.js';
 import { makePoster } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
+import { createAudioEngine } from './audio.js';
 
 /* ── DOM ───────────────────────────────────────────────────────────── */
 document.getElementById('pill').innerHTML =
@@ -271,6 +272,15 @@ function setLens(on, fast = false) {
 }
 lensBtn.addEventListener('click', () => setLens(!ui.lens));
 
+/* ── ambient audio (user gesture required by browser policy) ───────── */
+const audio = createAudioEngine(SETTINGS);
+const soundBtn = document.getElementById('sound-btn');
+soundBtn.addEventListener('click', () => {
+  const on = audio.toggle();
+  soundBtn.textContent = `Sound: ${on ? 'on' : 'off'}`;
+  soundBtn.classList.toggle('on', on);
+});
+
 /* ── project nav + detail mode ─────────────────────────────────────── */
 let detailOpen = false;
 let detailIdx = -1;
@@ -356,6 +366,9 @@ gui.add(SETTINGS, 'autoScroll').name('Auto-scroll')
   .onChange(v => v ? startAuto() : stopAuto(false));
 gui.add(SETTINGS, 'autoSpeed', 10, 300, 5).name('Auto speed');
 gui.add(SETTINGS, 'autoResume', 0, 20, 1).name('Auto-resume (s)');
+gui.add(SETTINGS, 'audioVolume', 0, 1, 0.01).name('Volume')
+  .onChange(v => audio.setVolume(v));
+gui.add(SETTINGS, 'audioWarp', 0, 3, 0.05).name('Audio warp');
 
 let paramsFolder = null;
 function rebuildParamsFolder() {
@@ -379,6 +392,7 @@ window.__setParam = (key, v) => {
 };
 window.__openDetail = (i) => { stopAuto(false); scrollToIndex(i, () => openDetail(i)); };
 window.__closeDetail = closeDetail;
+window.__audio = audio;
 
 /* ── render loop ───────────────────────────────────────────────────── */
 const start = performance.now();
@@ -417,6 +431,8 @@ function frame(now) {
     s.mat.uniforms.uVel.value = vel;
     s.mat.uniforms.uBend.value = SETTINGS.trackBend;
   });
+
+  audio.setWarp(vel, SETTINGS.maxVelocity);
 
   const u = materials[activeEffect].uniforms;
   u.time.value = ms;

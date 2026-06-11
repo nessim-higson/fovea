@@ -34,4 +34,9 @@ export const SETTINGS = {
   autoResume: 2,         // resume after N idle seconds (0 = never)
 
   trackBend: 1.0,        // how much the slide track bows with scroll velocity
+
+  audioSrc: null,        // mp3/stream URL for the ambient track, or null
+                         // for the procedural pad (no asset needed)
+  audioVolume: 0.5,      // 0..1
+  audioWarp: 1.0,        // how hard scroll velocity warps the audio
 };

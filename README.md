@@ -19,10 +19,18 @@ python3 -m http.server 8924
 
 ## Play
 
-- **Scroll** — endless project loop through the active effect
+- **Scroll** — endless project loop through the active effect; the
+  track itself bows with scroll direction (Track bend)
 - **G** — toggle the effects panel (switch passes, drag sliders live)
 - **Lens button** (bottom-left) — demos the home ↔ detail route
   transition (`displacement` 1 ↔ 0)
+- **Sound button** (bottom-left) — ambient audio; scroll velocity
+  bends its pitch, opens the filter and drives a waveshaper. With no
+  `audioSrc` configured it synthesizes a procedural pad; point
+  `SETTINGS.audioSrc` in [js/config.js](js/config.js) at an mp3 to use
+  a real track.
+- **Project nav** (bottom) — click to scroll to a project and open
+  its detail view (X / Escape closes)
 
 ## Plug in your work
 
