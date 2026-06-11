@@ -255,8 +255,13 @@ function rebuildParamsFolder() {
 }
 setEffect(SETTINGS.effect);
 
-// console handle for scripted control: __setEffect('rgb-echo')
+// console handles for scripted control:
+//   __setEffect('rgb-echo')   __setParam('flowAmp', 3)
 window.__setEffect = (id) => { sel.effect = id; setEffect(id); };
+window.__setParam = (key, v) => {
+  const u = materials[activeEffect].uniforms;
+  if (u[key]) u[key].value = v;
+};
 
 /* ── chip ──────────────────────────────────────────────────────────── */
 function updateChip() {
