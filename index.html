@@ -13,7 +13,14 @@
 
 <div class="overlay">
   <div class="pill" id="pill"></div>
-  <div class="chip" id="chip">—</div>
+
+  <div class="detail" id="detail" hidden>
+    <button class="detail-x" id="detail-x" aria-label="Close project">&#10005;</button>
+    <div class="detail-meta" id="detail-meta"></div>
+    <p class="detail-desc" id="detail-desc"></p>
+  </div>
+
+  <nav class="projnav" id="projnav" aria-label="Projects"></nav>
   <button class="lens-btn" id="lens-btn">Lens: on</button>
   <div class="hint">G — effects panel</div>
 </div>

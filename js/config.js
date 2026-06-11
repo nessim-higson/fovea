@@ -10,11 +10,16 @@ export const SITE = {
 // image: CORS-enabled URL (your CDN / Sanity / Cloudinary), or null for
 // a procedural placeholder poster.
 export const PROJECTS = [
-  { client: 'ACME',      title: 'Brand System',    year: 2025, image: null },
-  { client: 'HELIOS',    title: 'Launch Campaign', year: 2025, image: null },
-  { client: 'NORTHSTAR', title: 'Site Redesign',   year: 2024, image: null },
-  { client: 'MARU',      title: 'Editorial',       year: 2024, image: null },
-  { client: 'FORMA',     title: 'Film Direction',  year: 2023, image: null },
+  { client: 'ACME',      title: 'Brand System',    year: 2025, image: null,
+    description: 'Full identity program: marks, type system, motion principles and rollout guidelines.' },
+  { client: 'HELIOS',    title: 'Launch Campaign', year: 2025, image: null,
+    description: 'Global launch campaign across film, OOH and social — concept to delivery.' },
+  { client: 'NORTHSTAR', title: 'Site Redesign',   year: 2024, image: null,
+    description: 'Editorial-led web experience with a custom WebGL navigation system.' },
+  { client: 'MARU',      title: 'Editorial',       year: 2024, image: null,
+    description: 'Art direction and layout system for a quarterly print publication.' },
+  { client: 'FORMA',     title: 'Film Direction',  year: 2023, image: null,
+    description: 'Direction and grade for a three-part brand film series.' },
 ];
 
 // Global motion settings (all live-tweakable from the G panel too).
@@ -27,4 +32,6 @@ export const SETTINGS = {
   autoScroll: true,      // drift through projects on load
   autoSpeed: 60,         // px/second
   autoResume: 2,         // resume after N idle seconds (0 = never)
+
+  trackBend: 1.0,        // how much the slide track bows with scroll velocity
 };

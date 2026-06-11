@@ -1,10 +1,14 @@
 // ═══════════════════════════════════════════════════════════════════
-// APP — renderer, image stack, native-scroll loop, effect manager, GUI.
+// APP — renderer, image track, native-scroll loop, effect manager,
+// project nav + detail mode, GUI.
 //
 // Architecture (mirrors vincent-lowe.info, reverse-engineered):
-//   sceneA: image planes stacked vertically  → render target (tex1)
+//   sceneA: image planes on a deformable track → render target (tex1)
 //   sceneB: fullscreen quad with the active effect pass → screen
 //   Native page scroll drives everything; G toggles the tweak panel.
+//   Clicking a project in the bottom nav scrolls the track there and
+//   opens detail mode (lens collapses flat — the original's route
+//   transition).
 // ═══════════════════════════════════════════════════════════════════
 import * as THREE from 'three';
 import GUI from 'lil-gui';
@@ -15,9 +19,13 @@ import { EFFECTS, VERTEX } from './effects.js';
 /* ── DOM ───────────────────────────────────────────────────────────── */
 document.getElementById('pill').innerHTML =
   `<b>${SITE.studio}</b><br>${SITE.tagline}`;
-const chip = document.getElementById('chip');
-const lensBtn = document.getElementById('lens-btn');
-const spacer = document.getElementById('spacer');
+const lensBtn  = document.getElementById('lens-btn');
+const spacer   = document.getElementById('spacer');
+const navEl    = document.getElementById('projnav');
+const detailEl = document.getElementById('detail');
+const detailX  = document.getElementById('detail-x');
+const metaEl   = document.getElementById('detail-meta');
+const descEl   = document.getElementById('detail-desc');
 
 /* ── renderer + scenes ─────────────────────────────────────────────── */
 const renderer = new THREE.WebGLRenderer({
@@ -38,7 +46,23 @@ const sceneB = new THREE.Scene();
 const rt = new THREE.WebGLRenderTarget(
   VW * renderer.getPixelRatio(), VH * renderer.getPixelRatio());
 
-/* ── image stack (their near-passthrough material + grain ghost) ───── */
+/* ── image track ───────────────────────────────────────────────────
+   Each slide is a segmented plane so the TRACK BEND vertex shader can
+   bow it with scroll velocity: scroll down → bows down, up → up.
+*/
+const slideVert = /* glsl */`
+  varying vec2 vUv;
+  uniform float uVel;    // signed, smoothed scroll velocity (px/frame)
+  uniform float uBend;   // Track bend amount (GUI)
+
+  void main() {
+    vUv = uv;
+    vec3 pos = position;
+    // jelly bow: the middle of the card leads in the travel direction
+    pos.y += sin(uv.x * 3.1416) * uVel * uBend * 0.002;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+  }
+`;
 const imageFrag = /* glsl */`
   varying vec2 vUv;
   uniform sampler2D map;
@@ -60,16 +84,18 @@ const imageFrag = /* glsl */`
   }
 `;
 
-const planeGeo = new THREE.PlaneGeometry(1, 1);
+const planeGeo = new THREE.PlaneGeometry(1, 1, 32, 32);
 const slides = PROJECTS.map((p, i) => {
   const mat = new THREE.ShaderMaterial({
-    vertexShader: VERTEX,
+    vertexShader: slideVert,
     fragmentShader: imageFrag,
     uniforms: {
       map:        { value: makePoster(i, p) },
       time:       { value: 0 },
       detailMode: { value: 1 },
       opacity:    { value: 1 },
+      uVel:       { value: 0 },
+      uBend:      { value: SETTINGS.trackBend },
     },
   });
   const mesh = new THREE.Mesh(planeGeo, mat);
@@ -167,11 +193,37 @@ function rebase() {
 }
 window.addEventListener('scroll', rebase, { passive: true });
 
+function currentIndex() {
+  const n = PROJECTS.length;
+  return ((Math.round(smooth / VH) % n) + n) % n;
+}
+
+// animate the page scroll to a given Y (used by the project nav)
+let scrollAnim = null;
+function animateScrollTo(targetY, ms, done) {
+  const from = window.scrollY, t0 = performance.now();
+  scrollAnim = (now) => {
+    const k = Math.min(1, (now - t0) / ms);
+    const e = 1 - Math.pow(1 - k, 3); // cubicOut
+    window.scrollTo(0, from + (targetY - from) * e);
+    if (k >= 1) { scrollAnim = null; done && done(); }
+  };
+}
+
+function scrollToIndex(i, done) {
+  const cyc = cycleH();
+  const pos = ((window.scrollY % cyc) + cyc) % cyc;
+  let d = i * VH - pos;
+  d = ((d % cyc) + cyc * 1.5) % cyc - cyc / 2;   // nearest wrapped copy
+  if (Math.abs(d) < 2) { done && done(); return; }
+  animateScrollTo(window.scrollY + d, 700, done);
+}
+
 /* ── auto-scroll: drift on load, yield to the visitor, resume on idle ── */
 const auto = { active: false, acc: 0, idleTimer: null };
 
 function startAuto() {
-  if (SETTINGS.autoScroll) auto.active = true;
+  if (SETTINGS.autoScroll && !detailOpen) auto.active = true;
 }
 function stopAuto(resumable = true) {
   auto.active = false;
@@ -208,17 +260,78 @@ function tween(key, to, ms) {
 tween('opacity', 1, 1500);
 tween('displacement', 1, 2000);
 
-/* ── UI: lens button + GUI panel ───────────────────────────────────── */
+/* ── lens button ───────────────────────────────────────────────────── */
 const ui = { lens: true, ghost: false };
 
-function toggleLens(on) {
+function setLens(on, fast = false) {
   ui.lens = on;
   // reference timings: 0 in 100ms entering detail, 1 over 2s going home
-  tween('displacement', on ? 1 : 0, on ? 2000 : 100);
+  tween('displacement', on ? 1 : 0, on && !fast ? 2000 : 100);
   lensBtn.textContent = `Lens: ${on ? 'on' : 'off'}`;
 }
-lensBtn.addEventListener('click', () => toggleLens(!ui.lens));
+lensBtn.addEventListener('click', () => setLens(!ui.lens));
 
+/* ── project nav + detail mode ─────────────────────────────────────── */
+let detailOpen = false;
+let detailIdx = -1;
+
+const navBtns = PROJECTS.map((p, i) => {
+  const b = document.createElement('button');
+  b.textContent = p.client;
+  b.addEventListener('click', () => {
+    if (detailOpen && i === detailIdx) return;
+    stopAuto(false);
+    scrollToIndex(i, () => openDetail(i));
+  });
+  navEl.appendChild(b);
+  return b;
+});
+
+function openDetail(i) {
+  detailOpen = true;
+  detailIdx = i;
+  const p = PROJECTS[i];
+  metaEl.textContent =
+    `${String(i + 1).padStart(2, '0')} · ${p.client} — ${p.title} · ${p.year}`;
+  descEl.textContent = p.description || '';
+  detailEl.hidden = false;
+  stopAuto(false);
+  setLens(false);            // lens collapses flat, original route behavior
+}
+
+function closeDetail() {
+  detailOpen = false;
+  detailIdx = -1;
+  detailEl.hidden = true;
+  setLens(true);             // lens back over 2s
+  stopAuto(true);            // schedules the idle resume
+}
+
+detailX.addEventListener('click', closeDetail);
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && detailOpen) closeDetail();
+});
+
+// lock user scrolling while a project is open (programmatic still works)
+function guardScroll(e) { if (detailOpen) e.preventDefault(); }
+window.addEventListener('wheel', guardScroll, { passive: false });
+window.addEventListener('touchmove', guardScroll, { passive: false });
+window.addEventListener('keydown', (e) => {
+  if (detailOpen &&
+      ['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Home', 'End'].includes(e.key)) {
+    e.preventDefault();
+  }
+});
+
+let lastNavIdx = -1;
+function updateNav() {
+  const idx = detailOpen ? detailIdx : currentIndex();
+  if (idx === lastNavIdx) return;
+  lastNavIdx = idx;
+  navBtns.forEach((b, i) => b.classList.toggle('active', i === idx));
+}
+
+/* ── GUI panel ─────────────────────────────────────────────────────── */
 const gui = new GUI({ title: 'EFFECTS' });
 gui.hide();
 let guiVisible = false;
@@ -231,11 +344,12 @@ window.addEventListener('keydown', (e) => {
 
 const sel = { effect: SETTINGS.effect };
 gui.add(sel, 'effect', Object.keys(EFFECTS)).name('Pass').onChange(setEffect);
-gui.add(ui, 'lens').name('Lens (route demo)').onChange(toggleLens);
+gui.add(ui, 'lens').name('Lens (route demo)').onChange(v => setLens(v));
 gui.add(ui, 'ghost').name('Ghost images').onChange(v => {
   slides.forEach(s => s.mat.uniforms.detailMode.value = v ? 0 : 1);
 });
 gui.add(state, 'saturation', 0, 1, 0.01).name('Saturation');
+gui.add(SETTINGS, 'trackBend', 0, 3, 0.05).name('Track bend');
 gui.add(SETTINGS, 'smoothLerp', 0.02, 0.3, 0.005).name('Scroll ease');
 gui.add(SETTINGS, 'scrollLerp', 0.01, 0.3, 0.005).name('Velocity ease');
 gui.add(SETTINGS, 'autoScroll').name('Auto-scroll')
@@ -256,20 +370,15 @@ function rebuildParamsFolder() {
 setEffect(SETTINGS.effect);
 
 // console handles for scripted control:
-//   __setEffect('rgb-echo')   __setParam('flowAmp', 3)
+//   __setEffect('rgb-echo')   __setParam('smearAmount', 3)
+//   __openDetail(2)           __closeDetail()
 window.__setEffect = (id) => { sel.effect = id; setEffect(id); };
 window.__setParam = (key, v) => {
   const u = materials[activeEffect].uniforms;
   if (u[key]) u[key].value = v;
 };
-
-/* ── chip ──────────────────────────────────────────────────────────── */
-function updateChip() {
-  const n = PROJECTS.length;
-  const idx = ((Math.round(smooth / VH) % n) + n) % n;
-  const p = PROJECTS[idx];
-  chip.textContent = `${p.client} — ${p.title}`;
-}
+window.__openDetail = (i) => { stopAuto(false); scrollToIndex(i, () => openDetail(i)); };
+window.__closeDetail = closeDetail;
 
 /* ── render loop ───────────────────────────────────────────────────── */
 const start = performance.now();
@@ -281,6 +390,7 @@ function frame(now) {
   for (const k of Object.keys(tweens)) {
     if (!tweens[k](now)) delete tweens[k];
   }
+  if (scrollAnim) scrollAnim(now);
 
   // auto-scroll: accumulate fractional pixels so slow speeds stay smooth
   if (auto.active) {
@@ -293,6 +403,9 @@ function frame(now) {
   scrollDif += ((smooth - lastSmooth) - scrollDif) * SETTINGS.scrollLerp;
   lastSmooth = smooth;
 
+  const vel = THREE.MathUtils.clamp(
+    scrollDif, -SETTINGS.maxVelocity, SETTINGS.maxVelocity);
+
   const ms = now - start;
   const cyc = cycleH();
   const pos = ((smooth % cyc) + cyc) % cyc;
@@ -301,6 +414,8 @@ function frame(now) {
     d = ((d % cyc) + cyc * 1.5) % cyc - cyc / 2; // wrap to nearest copy
     s.mesh.position.y = -d;
     s.mat.uniforms.time.value = ms;
+    s.mat.uniforms.uVel.value = vel;
+    s.mat.uniforms.uBend.value = SETTINGS.trackBend;
   });
 
   const u = materials[activeEffect].uniforms;
@@ -308,8 +423,7 @@ function frame(now) {
   u.displacement.value = state.displacement;
   u.opacity.value = state.opacity;
   u.saturation.value = state.saturation;
-  u.scrollDif.value = THREE.MathUtils.clamp(
-    scrollDif, -SETTINGS.maxVelocity, SETTINGS.maxVelocity);
+  u.scrollDif.value = vel;
 
   renderer.setRenderTarget(rt);
   renderer.clear();
@@ -318,7 +432,7 @@ function frame(now) {
   renderer.clear();
   renderer.render(sceneB, camB);
 
-  updateChip();
+  updateNav();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
