@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 import GUI from 'lil-gui';
 import { SITE, PROJECTS, SETTINGS } from './config.js';
-import { makePoster } from './posters.js';
+import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
 
@@ -27,6 +27,10 @@ const detailEl = document.getElementById('detail');
 const detailX  = document.getElementById('detail-x');
 const metaEl   = document.getElementById('detail-meta');
 const descEl   = document.getElementById('detail-desc');
+
+// detail mode state (declared early — layout() runs at module load)
+let detailOpen = false;
+let detailIdx = -1;
 
 /* ── renderer + scenes ─────────────────────────────────────────────── */
 const renderer = new THREE.WebGLRenderer({
@@ -125,6 +129,60 @@ function fitCover(slide) {
   tex.offset.set((1 - visW) / 2, (1 - visH) / 2);
 }
 
+/* ── project galleries (detail mode) ───────────────────────────────
+   Each project's detail view is a long scroll of full-bleed images.
+   Placeholder galleries come from makeGallery(); a real project can
+   set PROJECTS[i].images = ['url', ...] instead.
+*/
+const galleries = {}; // index -> { items: [{mesh, mat, imgW, imgH}] }
+
+function makeSlideMaterial(texture) {
+  return new THREE.ShaderMaterial({
+    vertexShader: slideVert,
+    fragmentShader: imageFrag,
+    uniforms: {
+      map:        { value: texture },
+      time:       { value: 0 },
+      detailMode: { value: 1 },
+      opacity:    { value: 1 },
+      uVel:       { value: 0 },
+      uBend:      { value: SETTINGS.trackBend },
+    },
+  });
+}
+
+function buildGallery(i) {
+  if (galleries[i]) return galleries[i];
+  const project = PROJECTS[i];
+  const sources = (project.images && project.images.length)
+    ? project.images
+    : makeGallery(i, project);
+
+  const items = sources.map((src) => {
+    const isUrl = typeof src === 'string';
+    const mat = makeSlideMaterial(isUrl ? makePoster(i, project) : src);
+    const mesh = new THREE.Mesh(planeGeo, mat);
+    mesh.visible = false;
+    sceneA.add(mesh);
+    const item = { mesh, mat, imgW: 1080, imgH: 1440 };
+    if (isUrl) {
+      new THREE.TextureLoader().setCrossOrigin('anonymous').load(src, (t) => {
+        t.colorSpace = THREE.SRGBColorSpace;
+        mat.uniforms.map.value = t;
+        item.imgW = t.image.naturalWidth;
+        item.imgH = t.image.naturalHeight;
+        fitCover(item);
+      });
+    }
+    mesh.scale.set(VW, VH, 1);
+    fitCover(item);
+    return item;
+  });
+
+  galleries[i] = { items };
+  return galleries[i];
+}
+
 /* ── effect manager ────────────────────────────────────────────────── */
 const lensQuad = new THREE.Mesh(planeGeo);
 sceneB.add(lensQuad);
@@ -176,7 +234,11 @@ function layout() {
   }
   lensQuad.scale.set(VW, VH, 1);
   slides.forEach(s => { s.mesh.scale.set(VW, VH, 1); fitCover(s); });
-  spacer.style.height = (LOOPS * cycleH()) + 'px';
+  Object.values(galleries).forEach(g =>
+    g.items.forEach(it => { it.mesh.scale.set(VW, VH, 1); fitCover(it); }));
+  spacer.style.height = detailOpen && galleries[detailIdx]
+    ? (galleries[detailIdx].items.length * VH) + 'px'
+    : (LOOPS * cycleH()) + 'px';
 }
 layout();
 window.addEventListener('resize', layout);
@@ -185,6 +247,7 @@ window.scrollTo(0, Math.floor(LOOPS / 2) * cycleH());
 let smooth = window.scrollY, lastSmooth = smooth, scrollDif = 0;
 
 function rebase() {
+  if (detailOpen) return;    // gallery scroll is finite, no looping
   const y = window.scrollY, total = LOOPS * cycleH(), cyc = cycleH();
   if (y < cyc || y > total - cyc - VH) {
     const mid = Math.floor(LOOPS / 2) * cyc + (y % cyc);
@@ -217,6 +280,12 @@ function scrollToIndex(i, done) {
   let d = i * VH - pos;
   d = ((d % cyc) + cyc * 1.5) % cyc - cyc / 2;   // nearest wrapped copy
   if (Math.abs(d) < 2) { done && done(); return; }
+  // rAF is paused in hidden tabs — jump instead of stalling the open
+  if (document.hidden) {
+    window.scrollTo(0, window.scrollY + d);
+    done && done();
+    return;
+  }
   animateScrollTo(window.scrollY + d, 700, done);
 }
 
@@ -282,9 +351,6 @@ soundBtn.addEventListener('click', () => {
 });
 
 /* ── project nav + detail mode ─────────────────────────────────────── */
-let detailOpen = false;
-let detailIdx = -1;
-
 const navBtns = PROJECTS.map((p, i) => {
   const b = document.createElement('button');
   b.textContent = p.client;
@@ -297,6 +363,8 @@ const navBtns = PROJECTS.map((p, i) => {
   return b;
 });
 
+let homeScrollY = 0;
+
 function openDetail(i) {
   detailOpen = true;
   detailIdx = i;
@@ -305,6 +373,19 @@ function openDetail(i) {
     `${String(i + 1).padStart(2, '0')} · ${p.client} — ${p.title} · ${p.year}`;
   descEl.textContent = p.description || '';
   detailEl.hidden = false;
+
+  // swap the home track for this project's gallery scroll.
+  // gallery[0] is the cover, so the cut is seamless.
+  const g = buildGallery(i);
+  slides.forEach(s => s.mesh.visible = false);
+  Object.values(galleries).forEach(gg => gg.items.forEach(it => it.mesh.visible = false));
+  g.items.forEach(it => it.mesh.visible = true);
+
+  homeScrollY = window.scrollY;
+  spacer.style.height = (g.items.length * VH) + 'px';
+  window.scrollTo(0, 0);
+  smooth = 0; lastSmooth = 0; scrollDif = 0;
+
   stopAuto(false);
   setLens(false);            // lens collapses flat, original route behavior
 }
@@ -313,6 +394,14 @@ function closeDetail() {
   detailOpen = false;
   detailIdx = -1;
   detailEl.hidden = true;
+
+  // restore the home track exactly where it was left
+  Object.values(galleries).forEach(gg => gg.items.forEach(it => it.mesh.visible = false));
+  slides.forEach(s => s.mesh.visible = true);
+  spacer.style.height = (LOOPS * cycleH()) + 'px';
+  window.scrollTo(0, homeScrollY);
+  smooth = homeScrollY; lastSmooth = homeScrollY; scrollDif = 0;
+
   setLens(true);             // lens back over 2s
   stopAuto(true);            // schedules the idle resume
 }
@@ -320,17 +409,6 @@ function closeDetail() {
 detailX.addEventListener('click', closeDetail);
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && detailOpen) closeDetail();
-});
-
-// lock user scrolling while a project is open (programmatic still works)
-function guardScroll(e) { if (detailOpen) e.preventDefault(); }
-window.addEventListener('wheel', guardScroll, { passive: false });
-window.addEventListener('touchmove', guardScroll, { passive: false });
-window.addEventListener('keydown', (e) => {
-  if (detailOpen &&
-      ['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Home', 'End'].includes(e.key)) {
-    e.preventDefault();
-  }
 });
 
 let lastNavIdx = -1;
@@ -421,16 +499,26 @@ function frame(now) {
     scrollDif, -SETTINGS.maxVelocity, SETTINGS.maxVelocity);
 
   const ms = now - start;
-  const cyc = cycleH();
-  const pos = ((smooth % cyc) + cyc) % cyc;
-  slides.forEach((s, i) => {
-    let d = i * VH - pos;
-    d = ((d % cyc) + cyc * 1.5) % cyc - cyc / 2; // wrap to nearest copy
-    s.mesh.position.y = -d;
-    s.mat.uniforms.time.value = ms;
-    s.mat.uniforms.uVel.value = vel;
-    s.mat.uniforms.uBend.value = SETTINGS.trackBend;
-  });
+  if (detailOpen && galleries[detailIdx]) {
+    // finite gallery scroll — no wrapping
+    galleries[detailIdx].items.forEach((it, k) => {
+      it.mesh.position.y = -(k * VH - smooth);
+      it.mat.uniforms.time.value = ms;
+      it.mat.uniforms.uVel.value = vel;
+      it.mat.uniforms.uBend.value = SETTINGS.trackBend;
+    });
+  } else {
+    const cyc = cycleH();
+    const pos = ((smooth % cyc) + cyc) % cyc;
+    slides.forEach((s, i) => {
+      let d = i * VH - pos;
+      d = ((d % cyc) + cyc * 1.5) % cyc - cyc / 2; // wrap to nearest copy
+      s.mesh.position.y = -d;
+      s.mat.uniforms.time.value = ms;
+      s.mat.uniforms.uVel.value = vel;
+      s.mat.uniforms.uBend.value = SETTINGS.trackBend;
+    });
+  }
 
   audio.setWarp(vel, SETTINGS.maxVelocity);
 

@@ -29,8 +29,11 @@ python3 -m http.server 8924
   `audioSrc` configured it synthesizes a procedural pad; point
   `SETTINGS.audioSrc` in [js/config.js](js/config.js) at an mp3 to use
   a real track.
-- **Project nav** (bottom) — click to scroll to a project and open
-  its detail view (X / Escape closes)
+- **Project nav** (bottom) — click to ride the track to a project and
+  open its case study: a long scroll of full-bleed images (lens off,
+  track bend still alive). X / Escape returns to the loop. Galleries
+  are 5 generated shots per project until you set
+  `PROJECTS[i].images = ['url', ...]`.
 
 ## Plug in your work
 

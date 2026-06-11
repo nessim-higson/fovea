@@ -7,8 +7,10 @@ export const SITE = {
   tagline: 'Creative Direction & Design',
 };
 
-// image: CORS-enabled URL (your CDN / Sanity / Cloudinary), or null for
-// a procedural placeholder poster.
+// image:  CORS-enabled URL for the home-track cover, or null for a
+//         procedural placeholder poster.
+// images: array of CORS-enabled URLs for the project's detail gallery
+//         (long scroll). Omit to get 5 generated placeholder shots.
 export const PROJECTS = [
   { client: 'ACME',      title: 'Brand System',    year: 2025, image: null,
     description: 'Full identity program: marks, type system, motion principles and rollout guidelines.' },
