@@ -23,4 +23,8 @@ export const SETTINGS = {
   scrollLerp: 0.05,      // velocity smoothing (recovered from reference site)
   smoothLerp: 0.1,       // scroll position smoothing
   maxVelocity: 40,       // clamp on scroll velocity fed to shaders
+
+  autoScroll: true,      // drift through projects on load
+  autoSpeed: 60,         // px/second
+  autoResume: 8,         // resume after N idle seconds (0 = never)
 };

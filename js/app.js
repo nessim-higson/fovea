@@ -167,6 +167,31 @@ function rebase() {
 }
 window.addEventListener('scroll', rebase, { passive: true });
 
+/* ── auto-scroll: drift on load, yield to the visitor, resume on idle ── */
+const auto = { active: false, acc: 0, idleTimer: null };
+
+function startAuto() {
+  if (SETTINGS.autoScroll) auto.active = true;
+}
+function stopAuto(resumable = true) {
+  auto.active = false;
+  auto.acc = 0;
+  clearTimeout(auto.idleTimer);
+  if (resumable && SETTINGS.autoScroll && SETTINGS.autoResume > 0) {
+    auto.idleTimer = setTimeout(startAuto, SETTINGS.autoResume * 1000);
+  }
+}
+setTimeout(startAuto, 2500); // let the intro tweens land first
+
+for (const ev of ['wheel', 'touchstart']) {
+  window.addEventListener(ev, () => stopAuto(), { passive: true });
+}
+window.addEventListener('keydown', (e) => {
+  if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Home', 'End'].includes(e.key)) {
+    stopAuto();
+  }
+});
+
 /* ── tweens (svelte-tweened equivalents) ───────────────────────────── */
 const state = { displacement: 0, opacity: 0, saturation: 1 };
 const tweens = {};
@@ -213,6 +238,10 @@ gui.add(ui, 'ghost').name('Ghost images').onChange(v => {
 gui.add(state, 'saturation', 0, 1, 0.01).name('Saturation');
 gui.add(SETTINGS, 'smoothLerp', 0.02, 0.3, 0.005).name('Scroll ease');
 gui.add(SETTINGS, 'scrollLerp', 0.01, 0.3, 0.005).name('Velocity ease');
+gui.add(SETTINGS, 'autoScroll').name('Auto-scroll')
+  .onChange(v => v ? startAuto() : stopAuto(false));
+gui.add(SETTINGS, 'autoSpeed', 10, 300, 5).name('Auto speed');
+gui.add(SETTINGS, 'autoResume', 0, 20, 1).name('Auto-resume (s)');
 
 let paramsFolder = null;
 function rebuildParamsFolder() {
@@ -239,9 +268,20 @@ function updateChip() {
 
 /* ── render loop ───────────────────────────────────────────────────── */
 const start = performance.now();
+let lastNow = start;
 function frame(now) {
+  const dt = Math.min(now - lastNow, 100); // clamp tab-switch gaps
+  lastNow = now;
+
   for (const k of Object.keys(tweens)) {
     if (!tweens[k](now)) delete tweens[k];
+  }
+
+  // auto-scroll: accumulate fractional pixels so slow speeds stay smooth
+  if (auto.active) {
+    auto.acc += SETTINGS.autoSpeed * dt / 1000;
+    const whole = Math.trunc(auto.acc);
+    if (whole !== 0) { window.scrollBy(0, whole); auto.acc -= whole; }
   }
 
   smooth += (window.scrollY - smooth) * SETTINGS.smoothLerp;
