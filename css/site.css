@@ -1,0 +1,77 @@
+/* ═══════════════════════════════════════════════════════════════════
+   STUDIO SITE — base styles
+   The page is one WebGL canvas; DOM is overlay text only.
+   ═══════════════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: #000;
+  color: #fff;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+/* hide scrollbar, keep native scroll (same trick as the reference site) */
+html { scrollbar-width: none; }
+body::-webkit-scrollbar { display: none; }
+
+#gl { position: fixed; inset: 0; z-index: 1; display: block; }
+
+/* native-scroll spacer: gives the page real height to scroll */
+#spacer { position: relative; width: 100%; }
+
+.overlay { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
+.overlay > * { pointer-events: auto; }
+
+/* centered studio pill */
+.pill {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(90%, 400px);
+  padding: 12px 24px;
+  text-align: center;
+  text-transform: uppercase;
+  line-height: 1.6;
+  background: rgba(0,0,0,0.20);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+  user-select: none;
+}
+.pill b { font-weight: 700; }
+
+/* bottom project chip */
+.chip {
+  position: absolute; left: 50%; bottom: 14px;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  text-transform: uppercase;
+  background: rgba(0,0,0,0.25);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.lens-btn {
+  position: absolute; left: 14px; bottom: 14px;
+  padding: 6px 14px;
+  text-transform: uppercase;
+  background: rgba(0,0,0,0.25);
+  color: #fff; border: 0; font: inherit; letter-spacing: inherit;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.lens-btn:hover { background: rgba(255,255,255,0.15); }
+
+.hint {
+  position: absolute; right: 14px; bottom: 14px;
+  padding: 6px 0;
+  text-transform: uppercase;
+  opacity: 0.45;
+}
