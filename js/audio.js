@@ -80,9 +80,62 @@ export function createAudioEngine(SETTINGS) {
     }
   }
 
-  // procedural ambient pad: open A-chord drone + air noise
+  /* ── musical personality ──────────────────────────────────────────
+     The pad isn't a static drone: it wanders a slow chord progression
+     (each morph glides over ~15s), a sub breathes underneath, and
+     sparse pentatonic sparkles play over the top — more often while
+     you're scrolling.
+  */
+  const CHORDS = [
+    [110.00, 164.81, 220.00, 246.94, 329.63], // A2 E3 A3 B3 E4  (Am add9)
+    [ 87.31, 174.61, 220.00, 261.63, 349.23], // F2 F3 A3 C4 F4  (Fmaj)
+    [130.81, 164.81, 196.00, 246.94, 392.00], // C3 E3 G3 B3 G4  (Cmaj7)
+    [ 98.00, 146.83, 196.00, 293.66, 392.00], // G2 D3 G3 D4 G4  (Gsus)
+  ];
+  const PENTATONIC = [440, 523.25, 587.33, 659.25, 783.99, 880]; // A C D E G A
+  let chordIdx = 0;
+  let lastNorm = 0;   // most recent scroll intensity (0..1), set by setWarp
+
+  let subOsc = null;
+
+  function nextChord() {
+    if (!ctx) return;
+    chordIdx = (chordIdx + 1) % CHORDS.length;
+    const target = CHORDS[chordIdx];
+    oscillators.forEach((o, i) => {
+      // long time-constant = the chord melts rather than steps
+      o.frequency.setTargetAtTime(target[i % target.length], ctx.currentTime, 5);
+    });
+    // the sub follows the new root, one octave down
+    if (subOsc) subOsc.frequency.setTargetAtTime(target[0] / 2, ctx.currentTime, 5);
+  }
+
+  function pluck() {
+    if (!ctx || !running) return;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    const note = PENTATONIC[Math.floor(Math.random() * PENTATONIC.length)];
+    o.frequency.value = note * (Math.random() < 0.3 ? 2 : 1); // sometimes an octave up
+    const g = ctx.createGain();
+    const t = ctx.currentTime;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.045 + lastNorm * 0.05, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
+    o.connect(g);
+    g.connect(filter);  // sparkles inherit the delay wash + scroll warp
+    o.start(t);
+    o.stop(t + 2);
+  }
+
+  function scheduleSparkle() {
+    // scrolling raises the sparkle rate — the track plays along with you
+    const gap = (2400 + Math.random() * 4800) / (1 + lastNorm * 2.5);
+    setTimeout(() => { pluck(); scheduleSparkle(); }, gap);
+  }
+
+  // procedural ambient pad: wandering chord + sub pulse + air noise
   function buildPad() {
-    const chord = [110, 164.81, 220, 246.94, 329.63]; // A2 E3 A3 B3 E4
+    const chord = CHORDS[0];
     chord.forEach((f, i) => {
       const o = ctx.createOscillator();
       o.type = i < 2 ? 'triangle' : 'sine';
@@ -106,6 +159,22 @@ export function createAudioEngine(SETTINGS) {
       oscillators.push(o);
     });
 
+    // sub: a deep slow-breathing heartbeat under everything
+    // (kept out of `oscillators` so chord morphs don't lift it — it
+    // follows the chord root an octave down via nextChord)
+    subOsc = ctx.createOscillator();
+    subOsc.type = 'sine';
+    subOsc.frequency.value = CHORDS[0][0] / 2; // A1
+    const subG = ctx.createGain();
+    subG.gain.value = 0.05;
+    const subLfo = ctx.createOscillator();
+    subLfo.frequency.value = 0.07;
+    const subLfoG = ctx.createGain();
+    subLfoG.gain.value = 0.03;
+    subLfo.connect(subLfoG); subLfoG.connect(subG.gain);
+    subOsc.connect(subG); subG.connect(filter);
+    subOsc.start(); subLfo.start();
+
     // air: looped band-passed noise
     const len = ctx.sampleRate * 2;
     const buf = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -118,6 +187,10 @@ export function createAudioEngine(SETTINGS) {
     const ng = ctx.createGain(); ng.gain.value = 0.025;
     noise.connect(nf); nf.connect(ng); ng.connect(filter);
     noise.start();
+
+    // start the life: chord wander + sparkles
+    setInterval(nextChord, 19000);
+    scheduleSparkle();
   }
 
   return {
@@ -146,10 +219,12 @@ export function createAudioEngine(SETTINGS) {
       if (!ctx || !running) return;
       const warp = SETTINGS.audioWarp;
       const norm = Math.min(Math.abs(velSigned) / maxVel, 1);
+      lastNorm = norm;   // sparkle scheduler reads this
 
       // pitch bends with scroll direction
       const cents = (velSigned / maxVel) * 80 * warp;
       oscillators.forEach((o, i) => { o.detune.value = baseDetunes[i] + cents; });
+      if (subOsc) subOsc.detune.value = cents;
       if (mediaEl) mediaEl.playbackRate = 1 + (velSigned / maxVel) * 0.07 * warp;
 
       // drive + filter open with speed

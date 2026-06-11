@@ -129,12 +129,14 @@ function fitCover(slide) {
   tex.offset.set((1 - visW) / 2, (1 - visH) / 2);
 }
 
-/* ── project galleries (detail mode) ───────────────────────────────
-   Each project's detail view is a long scroll of full-bleed images.
-   Placeholder galleries come from makeGallery(); a real project can
-   set PROJECTS[i].images = ['url', ...] instead.
+/* ── the case track (detail mode) ──────────────────────────────────
+   ALL projects' galleries live on ONE continuous looping track —
+   projects bleed into each other on a long scroll. Clicking a pill
+   while inside glides visibly along the track. Placeholder shots
+   come from makeGallery(); real projects set PROJECTS[i].images.
 */
-const galleries = {}; // index -> { items: [{mesh, mat, imgW, imgH}] }
+let caseTrack = null;   // { items, starts, N }
+const CASE_LOOPS = 4;
 
 function makeSlideMaterial(texture) {
   return new THREE.ShaderMaterial({
@@ -151,36 +153,49 @@ function makeSlideMaterial(texture) {
   });
 }
 
-function buildGallery(i) {
-  if (galleries[i]) return galleries[i];
-  const project = PROJECTS[i];
-  const sources = (project.images && project.images.length)
-    ? project.images
-    : makeGallery(i, project);
+function buildCaseTrack() {
+  if (caseTrack) return caseTrack;
+  const items = [];
+  const starts = [];
 
-  const items = sources.map((src) => {
-    const isUrl = typeof src === 'string';
-    const mat = makeSlideMaterial(isUrl ? makePoster(i, project) : src);
-    const mesh = new THREE.Mesh(planeGeo, mat);
-    mesh.visible = false;
-    sceneA.add(mesh);
-    const item = { mesh, mat, imgW: 1080, imgH: 1440 };
-    if (isUrl) {
-      new THREE.TextureLoader().setCrossOrigin('anonymous').load(src, (t) => {
-        t.colorSpace = THREE.SRGBColorSpace;
-        mat.uniforms.map.value = t;
-        item.imgW = t.image.naturalWidth;
-        item.imgH = t.image.naturalHeight;
-        fitCover(item);
-      });
-    }
-    mesh.scale.set(VW, VH, 1);
-    fitCover(item);
-    return item;
+  PROJECTS.forEach((project, i) => {
+    starts.push(items.length);
+    const sources = (project.images && project.images.length)
+      ? project.images
+      : makeGallery(i, project);
+
+    sources.forEach((src) => {
+      const isUrl = typeof src === 'string';
+      const mat = makeSlideMaterial(isUrl ? makePoster(i, project) : src);
+      const mesh = new THREE.Mesh(planeGeo, mat);
+      mesh.visible = false;
+      sceneA.add(mesh);
+      const item = { mesh, mat, imgW: 1080, imgH: 1440 };
+      if (isUrl) {
+        new THREE.TextureLoader().setCrossOrigin('anonymous').load(src, (t) => {
+          t.colorSpace = THREE.SRGBColorSpace;
+          mat.uniforms.map.value = t;
+          item.imgW = t.image.naturalWidth;
+          item.imgH = t.image.naturalHeight;
+          fitCover(item);
+        });
+      }
+      mesh.scale.set(VW, VH, 1);
+      fitCover(item);
+      items.push(item);
+    });
   });
 
-  galleries[i] = { items };
-  return galleries[i];
+  caseTrack = { items, starts, N: items.length };
+  return caseTrack;
+}
+
+// which project owns case-track item k
+function projOfItem(k) {
+  const s = caseTrack.starts;
+  let p = 0;
+  for (let i = 0; i < s.length; i++) if (k >= s[i]) p = i;
+  return p;
 }
 
 /* ── effect manager ────────────────────────────────────────────────── */
@@ -234,10 +249,11 @@ function layout() {
   }
   lensQuad.scale.set(VW, VH, 1);
   slides.forEach(s => { s.mesh.scale.set(VW, VH, 1); fitCover(s); });
-  Object.values(galleries).forEach(g =>
-    g.items.forEach(it => { it.mesh.scale.set(VW, VH, 1); fitCover(it); }));
-  spacer.style.height = detailOpen && galleries[detailIdx]
-    ? (galleries[detailIdx].items.length * VH) + 'px'
+  if (caseTrack) {
+    caseTrack.items.forEach(it => { it.mesh.scale.set(VW, VH, 1); fitCover(it); });
+  }
+  spacer.style.height = detailOpen && caseTrack
+    ? (CASE_LOOPS * caseTrack.N * VH) + 'px'
     : (LOOPS * cycleH()) + 'px';
 }
 layout();
@@ -247,15 +263,30 @@ window.scrollTo(0, Math.floor(LOOPS / 2) * cycleH());
 let smooth = window.scrollY, lastSmooth = smooth, scrollDif = 0;
 
 function rebase() {
-  if (detailOpen) return;    // gallery scroll is finite, no looping
-  const y = window.scrollY, total = LOOPS * cycleH(), cyc = cycleH();
+  if (scrollAnim) return;    // don't teleport mid-glide
+  const inCase = detailOpen && caseTrack;
+  const cyc = inCase ? caseTrack.N * VH : cycleH();
+  const loops = inCase ? CASE_LOOPS : LOOPS;
+  const y = window.scrollY, total = loops * cyc;
   if (y < cyc || y > total - cyc - VH) {
-    const mid = Math.floor(LOOPS / 2) * cyc + (y % cyc);
+    const mid = Math.floor(loops / 2) * cyc + (y % cyc);
     window.scrollTo(0, mid);
     smooth += mid - y; lastSmooth += mid - y;
   }
 }
 window.addEventListener('scroll', rebase, { passive: true });
+
+// eased scroll glide — used for riding the case track between projects
+let scrollAnim = null;
+function animateScrollTo(targetY, ms) {
+  const from = window.scrollY, t0 = performance.now();
+  scrollAnim = (now) => {
+    const k = Math.min(1, (now - t0) / ms);
+    const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; // cubic inOut
+    window.scrollTo(0, from + (targetY - from) * e);
+    if (k >= 1) { scrollAnim = null; rebase(); }
+  };
+}
 
 function currentIndex() {
   const n = PROJECTS.length;
@@ -347,28 +378,29 @@ function fadeSwap(swapFn, fadeOut = 220, fadeIn = 700) {
   }, fadeOut + 30);
 }
 
-let homeScrollY = 0;
-
-// swap to project i's gallery — runs at black, so everything is instant
-function mountGallery(i) {
-  detailOpen = true;
-  detailIdx = i;
+function populateCard(i) {
   const p = PROJECTS[i];
   metaEl.textContent =
     `${String(i + 1).padStart(2, '0')} · ${p.client} — ${p.title} · ${p.year}`;
   descEl.textContent = p.description || '';
+}
+
+// enter the case track at project i — runs at black, so it's instant
+function mountCase(i) {
+  detailOpen = true;
+  detailIdx = i;
+  populateCard(i);
   detailEl.hidden = false;
 
-  const g = buildGallery(i);
+  const t = buildCaseTrack();
   slides.forEach(s => s.mesh.visible = false);
-  Object.values(galleries).forEach(gg => gg.items.forEach(it => it.mesh.visible = false));
-  g.items.forEach(it => it.mesh.visible = true);
+  t.items.forEach(it => it.mesh.visible = true);
 
-  // closing later returns home AT this project
-  homeScrollY = Math.floor(LOOPS / 2) * cycleH() + i * VH;
-  spacer.style.height = (g.items.length * VH) + 'px';
-  window.scrollTo(0, 0);
-  smooth = 0; lastSmooth = 0; scrollDif = 0;
+  const cyc = t.N * VH;
+  spacer.style.height = (CASE_LOOPS * cyc) + 'px';
+  const y = Math.floor(CASE_LOOPS / 2) * cyc + t.starts[i] * VH;
+  window.scrollTo(0, y);
+  smooth = y; lastSmooth = y; scrollDif = 0;
 
   // lens off instantly — we're at black, no need to animate it
   delete tweens.displacement;
@@ -377,25 +409,43 @@ function mountGallery(i) {
   lensBtn.textContent = 'Lens: off';
 }
 
+// already inside: glide along the bleeding track — the visible ride
+function glideToProject(i) {
+  const cyc = caseTrack.N * VH;
+  const pos = ((window.scrollY % cyc) + cyc) % cyc;
+  let d = caseTrack.starts[i] * VH - pos;
+  d = ((d % cyc) + cyc * 1.5) % cyc - cyc / 2;   // nearest wrapped copy
+  if (Math.abs(d) < 2) return;
+  if (document.hidden) { window.scrollTo(0, window.scrollY + d); return; }
+  const ms = Math.min(600 + (Math.abs(d) / VH) * 140, 1800);
+  animateScrollTo(window.scrollY + d, ms);
+}
+
 function openProject(i) {
   if (transitioning) return;
   if (detailOpen && i === detailIdx) return;
   stopAuto(false);
-  fadeSwap(() => mountGallery(i));
+  if (detailOpen) {
+    glideToProject(i);
+  } else {
+    fadeSwap(() => mountCase(i));
+  }
 }
 
 function closeDetail() {
   if (transitioning || !detailOpen) return;
+  // return home at whichever project is currently in view
+  const homeY = Math.floor(LOOPS / 2) * cycleH() + detailIdx * VH;
   fadeSwap(() => {
     detailOpen = false;
     detailIdx = -1;
     detailEl.hidden = true;
 
-    Object.values(galleries).forEach(gg => gg.items.forEach(it => it.mesh.visible = false));
+    caseTrack.items.forEach(it => it.mesh.visible = false);
     slides.forEach(s => s.mesh.visible = true);
     spacer.style.height = (LOOPS * cycleH()) + 'px';
-    window.scrollTo(0, homeScrollY);
-    smooth = homeScrollY; lastSmooth = homeScrollY; scrollDif = 0;
+    window.scrollTo(0, homeY);
+    smooth = homeY; lastSmooth = homeY; scrollDif = 0;
 
     setLens(true);           // lens blooms back during the fade-in
     stopAuto(true);          // schedules the idle resume
@@ -479,6 +529,7 @@ function frame(now) {
   for (const k of Object.keys(tweens)) {
     if (!tweens[k](now)) delete tweens[k];
   }
+  if (scrollAnim) scrollAnim(now);
 
   // auto-scroll: accumulate fractional pixels so slow speeds stay smooth
   if (auto.active) {
@@ -495,14 +546,26 @@ function frame(now) {
     scrollDif, -SETTINGS.maxVelocity, SETTINGS.maxVelocity);
 
   const ms = now - start;
-  if (detailOpen && galleries[detailIdx]) {
-    // finite gallery scroll — no wrapping
-    galleries[detailIdx].items.forEach((it, k) => {
-      it.mesh.position.y = -(k * VH - smooth);
+  if (detailOpen && caseTrack) {
+    // looping case track — projects bleed into one another
+    const cyc = caseTrack.N * VH;
+    const pos = ((smooth % cyc) + cyc) % cyc;
+    caseTrack.items.forEach((it, k) => {
+      let d = k * VH - pos;
+      d = ((d % cyc) + cyc * 1.5) % cyc - cyc / 2; // wrap to nearest copy
+      it.mesh.position.y = -d;
       it.mat.uniforms.time.value = ms;
       it.mat.uniforms.uVel.value = vel;
       it.mat.uniforms.uBend.value = SETTINGS.trackBend;
     });
+
+    // live project derivation — the card + nav follow the scroll
+    const k = ((Math.round(smooth / VH) % caseTrack.N) + caseTrack.N) % caseTrack.N;
+    const pr = projOfItem(k);
+    if (pr !== detailIdx) {
+      detailIdx = pr;
+      populateCard(pr);
+    }
   } else {
     const cyc = cycleH();
     const pos = ((smooth % cyc) + cyc) % cyc;
