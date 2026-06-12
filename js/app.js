@@ -12,10 +12,15 @@
 // ═══════════════════════════════════════════════════════════════════
 import * as THREE from 'three';
 import GUI from 'lil-gui';
-import { SITE, PROJECTS, SETTINGS } from './config.js';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
+
+// content sets: ?set=<name> loads js/config-<name>.js (e.g. ?set=uniqlock)
+const CONTENT_SET = new URLSearchParams(location.search).get('set');
+const { SITE, PROJECTS, SETTINGS } = await import(
+  CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config.js'
+);
 
 /* ── DOM ───────────────────────────────────────────────────────────── */
 document.getElementById('pill').innerHTML =
@@ -89,6 +94,38 @@ const imageFrag = /* glsl */`
   }
 `;
 
+/* ── media loader: images AND videos become slide textures ─────────
+   Videos (muted/looped/autoplaying) feed THREE.VideoTexture — same
+   technique the reference site uses for its film content.
+*/
+const VIDEO_RE = /\.(mp4|m4v|webm|mov)(\?.*)?$/i;
+function loadMedia(src, holder) {
+  if (VIDEO_RE.test(src)) {
+    const v = document.createElement('video');
+    v.muted = true; v.loop = true; v.playsInline = true; v.autoplay = true;
+    v.crossOrigin = 'anonymous';
+    v.src = src;
+    holder.video = v;
+    v.addEventListener('loadedmetadata', () => {
+      holder.imgW = v.videoWidth || 16;
+      holder.imgH = v.videoHeight || 9;
+      const t = new THREE.VideoTexture(v);
+      t.colorSpace = THREE.SRGBColorSpace;
+      holder.mat.uniforms.map.value = t;
+      fitCover(holder);
+    });
+    v.play().catch(() => {});
+  } else {
+    new THREE.TextureLoader().setCrossOrigin('anonymous').load(src, (t) => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      holder.mat.uniforms.map.value = t;
+      holder.imgW = t.image.naturalWidth;
+      holder.imgH = t.image.naturalHeight;
+      fitCover(holder);
+    });
+  }
+}
+
 const planeGeo = new THREE.PlaneGeometry(1, 1, 32, 32);
 const slides = PROJECTS.map((p, i) => {
   const mat = new THREE.ShaderMaterial({
@@ -106,15 +143,7 @@ const slides = PROJECTS.map((p, i) => {
   const mesh = new THREE.Mesh(planeGeo, mat);
   sceneA.add(mesh);
   const slide = { mesh, mat, imgW: 1080, imgH: 1440 };
-  if (p.image) {
-    new THREE.TextureLoader().setCrossOrigin('anonymous').load(p.image, (t) => {
-      t.colorSpace = THREE.SRGBColorSpace;
-      mat.uniforms.map.value = t;
-      slide.imgW = t.image.naturalWidth;
-      slide.imgH = t.image.naturalHeight;
-      fitCover(slide);
-    });
-  }
+  if (p.image) loadMedia(p.image, slide);
   return slide;
 });
 
@@ -171,15 +200,7 @@ function buildCaseTrack() {
       mesh.visible = false;
       sceneA.add(mesh);
       const item = { mesh, mat, imgW: 1080, imgH: 1440 };
-      if (isUrl) {
-        new THREE.TextureLoader().setCrossOrigin('anonymous').load(src, (t) => {
-          t.colorSpace = THREE.SRGBColorSpace;
-          mat.uniforms.map.value = t;
-          item.imgW = t.image.naturalWidth;
-          item.imgH = t.image.naturalHeight;
-          fitCover(item);
-        });
-      }
+      if (isUrl) loadMedia(src, item);
       mesh.scale.set(VW, VH, 1);
       fitCover(item);
       items.push(item);
@@ -394,7 +415,10 @@ function mountCase(i) {
 
   const t = buildCaseTrack();
   slides.forEach(s => s.mesh.visible = false);
-  t.items.forEach(it => it.mesh.visible = true);
+  t.items.forEach(it => {
+    it.mesh.visible = true;
+    if (it.video) it.video.play().catch(() => {});
+  });
 
   const cyc = t.N * VH;
   spacer.style.height = (CASE_LOOPS * cyc) + 'px';
@@ -441,7 +465,10 @@ function closeDetail() {
     detailIdx = -1;
     detailEl.hidden = true;
 
-    caseTrack.items.forEach(it => it.mesh.visible = false);
+    caseTrack.items.forEach(it => {
+      it.mesh.visible = false;
+      if (it.video) it.video.pause();
+    });
     slides.forEach(s => s.mesh.visible = true);
     spacer.style.height = (LOOPS * cycleH()) + 'px';
     window.scrollTo(0, homeY);
