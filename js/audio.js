@@ -72,6 +72,11 @@ export function createAudioEngine(SETTINGS) {
       mediaEl = new Audio(SETTINGS.audioSrc);
       mediaEl.loop = true;
       mediaEl.crossOrigin = 'anonymous';
+      // tape-style bend: vary pitch WITH rate. Also the cheap path —
+      // pitch-preserving time-stretch is very CPU-hungry when the
+      // rate changes continuously.
+      mediaEl.preservesPitch = false;
+      mediaEl.webkitPreservesPitch = false;
       const node = ctx.createMediaElementSource(mediaEl);
       node.connect(filter);
       mediaEl.play().catch(() => {});
@@ -94,7 +99,8 @@ export function createAudioEngine(SETTINGS) {
   ];
   const PENTATONIC = [440, 523.25, 587.33, 659.25, 783.99, 880]; // A C D E G A
   let chordIdx = 0;
-  let lastNorm = 0;   // most recent scroll intensity (0..1), set by setWarp
+  let lastNorm = 0;        // most recent scroll intensity (0..1), set by setWarp
+  let lastParamUpdate = 0; // setWarp throttle clock (ctx time, seconds)
 
   let subOsc = null;
 
@@ -214,23 +220,39 @@ export function createAudioEngine(SETTINGS) {
       }
     },
 
-    // velSigned: smoothed scroll velocity (± px/frame, clamped)
+    // velSigned: smoothed scroll velocity (± px/frame, clamped).
+    // Called every visual frame, but audio params only need ~14Hz —
+    // we throttle and let setTargetAtTime glide between updates.
     setWarp(velSigned, maxVel) {
       if (!ctx || !running) return;
+      const now = ctx.currentTime;
+      if (now - lastParamUpdate < 0.07) return;
+      lastParamUpdate = now;
+
       const warp = SETTINGS.audioWarp;
       const norm = Math.min(Math.abs(velSigned) / maxVel, 1);
       lastNorm = norm;   // sparkle scheduler reads this
 
       // pitch bends with scroll direction
       const cents = (velSigned / maxVel) * 80 * warp;
-      oscillators.forEach((o, i) => { o.detune.value = baseDetunes[i] + cents; });
-      if (subOsc) subOsc.detune.value = cents;
-      if (mediaEl) mediaEl.playbackRate = 1 + (velSigned / maxVel) * 0.07 * warp;
+      oscillators.forEach((o, i) => {
+        o.detune.setTargetAtTime(baseDetunes[i] + cents, now, 0.08);
+      });
+      if (subOsc) subOsc.detune.setTargetAtTime(cents, now, 0.08);
+      if (mediaEl) {
+        // epsilon gate — rate changes reconfigure the audio pipeline,
+        // so only touch it when the value meaningfully moved
+        const rate = 1 + (velSigned / maxVel) * 0.07 * warp;
+        if (Math.abs(rate - mediaEl.playbackRate) > 0.005) {
+          mediaEl.playbackRate = rate;
+        }
+      }
 
       // drive + filter open with speed
-      wetGain.gain.value = Math.min(1, norm * 1.4 * warp);
-      dryGain.gain.value = 1 - wetGain.gain.value * 0.6;
-      filter.frequency.value = 1100 + norm * 2600 * warp;
+      const wet = Math.min(1, norm * 1.4 * warp);
+      wetGain.gain.setTargetAtTime(wet, now, 0.08);
+      dryGain.gain.setTargetAtTime(1 - wet * 0.6, now, 0.08);
+      filter.frequency.setTargetAtTime(1100 + norm * 2600 * warp, now, 0.08);
     },
 
     get running() { return running; },
