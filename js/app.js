@@ -228,16 +228,42 @@ function buildCaseTrack() {
       mesh.visible = false;
       sceneA.add(mesh);
       const item = { mesh, mat, imgW: 1080, imgH: 1440 };
-      item.fit = () => fitContain(item);   // sub-pages: whole work, undistorted
+      item.fit = relayoutCase;   // any image load re-flows the whole track
       if (isUrl) loadMedia(src, item);
-      item.fit();
       items.push(item);
     });
   });
 
-  caseTrack = { items, starts, N: items.length };
+  caseTrack = { items, starts, N: items.length, heights: [], tops: [], trackH: 0 };
   window.__caseTrack = caseTrack;
+  relayoutCase();
   return caseTrack;
+}
+
+// FULL-WIDTH SCROLL-THROUGH layout: every sub-page image fills the
+// viewport width at its natural aspect, stacked into one tall filmstrip.
+// Tall pieces extend past the screen and are revealed by scrolling —
+// nothing cropped, stretched, or skewed.
+function relayoutCase() {
+  if (!caseTrack) return;
+  const its = caseTrack.items;
+  let acc = 0;
+  for (let k = 0; k < its.length; k++) {
+    const it = its[k];
+    const [iw, ih] = mediaDims(it.mat.uniforms.map.value);
+    const h = VW * ih / iw;            // full width, natural height
+    caseTrack.heights[k] = h;
+    caseTrack.tops[k] = acc;
+    acc += h;
+    it.mesh.scale.set(VW, h, 1);
+    const tex = it.mat.uniforms.map.value;
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.center.set(0.5, 0.5);
+    tex.repeat.set(1, 1);
+    tex.offset.set(0, 0);
+  }
+  caseTrack.trackH = acc;
+  if (detailOpen) spacer.style.height = (CASE_LOOPS * acc) + 'px';
 }
 
 // which project owns case-track item k
@@ -299,11 +325,9 @@ function layout() {
   }
   lensQuad.scale.set(VW, VH, 1);
   slides.forEach(s => { s.mesh.scale.set(VW, VH, 1); s.fit(); });
-  if (caseTrack) {
-    caseTrack.items.forEach(it => it.fit());
-  }
+  if (caseTrack) relayoutCase();
   spacer.style.height = detailOpen && caseTrack
-    ? (CASE_LOOPS * caseTrack.N * VH) + 'px'
+    ? (CASE_LOOPS * caseTrack.trackH) + 'px'
     : (LOOPS * cycleH()) + 'px';
 }
 layout();
@@ -319,7 +343,7 @@ let prevY = window.scrollY, userVel = 0;
 function rebase() {
   if (scrollAnim) return;    // don't teleport mid-glide
   const inCase = detailOpen && caseTrack;
-  const cyc = inCase ? caseTrack.N * VH : cycleH();
+  const cyc = inCase ? caseTrack.trackH : cycleH();
   const loops = inCase ? CASE_LOOPS : LOOPS;
   const y = window.scrollY, total = loops * cyc;
   if (y < cyc || y > total - cyc - VH) {
@@ -455,9 +479,12 @@ function mountCase(i) {
     if (it.video) it.video.play().catch(() => {});
   });
 
-  const cyc = t.N * VH;
+  relayoutCase();            // ensure heights/tops current for this VW
+  const cyc = caseTrack.trackH;
   spacer.style.height = (CASE_LOOPS * cyc) + 'px';
-  const y = Math.floor(CASE_LOOPS / 2) * cyc + t.starts[i] * VH;
+  // top-align project i's first image to the viewport top, then scroll down through it
+  const startTop = caseTrack.tops[t.starts[i]];
+  const y = Math.floor(CASE_LOOPS / 2) * cyc + startTop + VH / 2;
   window.scrollTo(0, y);
   smooth = y; lastSmooth = y; scrollDif = 0;
   prevY = y; userVel = 0;   // no smear flash from the position jump
@@ -474,9 +501,10 @@ function mountCase(i) {
 
 // already inside: glide along the bleeding track — the visible ride
 function glideToProject(i) {
-  const cyc = caseTrack.N * VH;
+  const cyc = caseTrack.trackH;
   const pos = ((window.scrollY % cyc) + cyc) % cyc;
-  let d = caseTrack.starts[i] * VH - pos;
+  const target = caseTrack.tops[caseTrack.starts[i]] + VH / 2;  // top-align
+  let d = target - pos;
   d = ((d % cyc) + cyc * 1.5) % cyc - cyc / 2;   // nearest wrapped copy
   if (Math.abs(d) < 2) return;
   if (document.hidden) { window.scrollTo(0, window.scrollY + d); return; }
@@ -625,10 +653,11 @@ function frame(now) {
   const ms = now - start;
   if (detailOpen && caseTrack) {
     // looping case track — projects bleed into one another
-    const cyc = caseTrack.N * VH;
+    const cyc = caseTrack.trackH;
     const pos = ((smooth % cyc) + cyc) % cyc;
     caseTrack.items.forEach((it, k) => {
-      let d = k * VH - pos;
+      const center = caseTrack.tops[k] + caseTrack.heights[k] / 2;
+      let d = center - pos;
       d = ((d % cyc) + cyc * 1.5) % cyc - cyc / 2; // wrap to nearest copy
       it.mesh.position.y = -d;
       it.mat.uniforms.time.value = ms;
@@ -636,9 +665,12 @@ function frame(now) {
       it.mat.uniforms.uBend.value = 0; // sub-pages present work flat — no bow
     });
 
-    // live project derivation — the card + nav follow the scroll
-    const k = ((Math.round(smooth / VH) % caseTrack.N) + caseTrack.N) % caseTrack.N;
-    const pr = projOfItem(k);
+    // live project derivation — whichever item sits at viewport centre
+    let cur = 0;
+    for (let k = 0; k < caseTrack.items.length; k++) {
+      if (pos >= caseTrack.tops[k]) cur = k;
+    }
+    const pr = projOfItem(cur);
     if (pr !== detailIdx) {
       detailIdx = pr;
       populateCard(pr);
