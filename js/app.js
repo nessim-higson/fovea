@@ -323,6 +323,10 @@ window.addEventListener('resize', layout);
 window.scrollTo(0, Math.floor(LOOPS / 2) * cycleH());
 
 let smooth = window.scrollY, lastSmooth = smooth, scrollDif = 0;
+// velocity that drives the distortion is computed from USER scroll only —
+// the auto-drift is subtracted out (see frame loop), so auto-playing
+// pages show clean, undistorted crops while manual scrolling still warps.
+let prevY = window.scrollY, userVel = 0;
 
 function rebase() {
   if (scrollAnim) return;    // don't teleport mid-glide
@@ -334,6 +338,7 @@ function rebase() {
     const mid = Math.floor(loops / 2) * cyc + (y % cyc);
     window.scrollTo(0, mid);
     smooth += mid - y; lastSmooth += mid - y;
+    prevY += mid - y;   // keep user-velocity continuous across the wrap
   }
 }
 window.addEventListener('scroll', rebase, { passive: true });
@@ -467,6 +472,7 @@ function mountCase(i) {
   const y = Math.floor(CASE_LOOPS / 2) * cyc + t.starts[i] * VH;
   window.scrollTo(0, y);
   smooth = y; lastSmooth = y; scrollDif = 0;
+  prevY = y; userVel = 0;   // no smear flash from the position jump
 
   // lens off instantly — we're at black, no need to animate it
   delete tweens.displacement;
@@ -518,6 +524,7 @@ function closeDetail() {
     spacer.style.height = (LOOPS * cycleH()) + 'px';
     window.scrollTo(0, homeY);
     smooth = homeY; lastSmooth = homeY; scrollDif = 0;
+    prevY = homeY; userVel = 0;
 
     setLens(true);           // lens blooms back during the fade-in
     stopAuto(true);          // schedules the idle resume
@@ -590,6 +597,7 @@ window.__openDetail = openProject;
 window.__closeDetail = closeDetail;
 window.__audio = audio;
 window.__state = state;
+window.__vel = () => userVel;
 
 /* ── render loop ───────────────────────────────────────────────────── */
 const start = performance.now();
@@ -605,18 +613,26 @@ function frame(now) {
 
   // auto-scroll: accumulate fractional pixels so slow speeds stay smooth.
   // paused while a glide is animating so they don't fight.
+  let autoWhole = 0;
   if (auto.active && !scrollAnim) {
     auto.acc += SETTINGS.autoSpeed * dt / 1000;
-    const whole = Math.trunc(auto.acc);
-    if (whole !== 0) { window.scrollBy(0, whole); auto.acc -= whole; }
+    autoWhole = Math.trunc(auto.acc);
+    if (autoWhole !== 0) { window.scrollBy(0, autoWhole); auto.acc -= autoWhole; }
   }
 
+  // slide positions follow the TOTAL scroll (auto + user + glide)
   smooth += (window.scrollY - smooth) * SETTINGS.smoothLerp;
-  scrollDif += ((smooth - lastSmooth) - scrollDif) * SETTINGS.scrollLerp;
   lastSmooth = smooth;
 
+  // distortion velocity follows USER scroll only — subtract the auto
+  // drift so a drifting page is a clean focused crop, not a warped one
+  const curY = window.scrollY;
+  const userDelta = (curY - prevY) - autoWhole;
+  prevY = curY;
+  userVel += (userDelta - userVel) * SETTINGS.scrollLerp;
+
   const vel = THREE.MathUtils.clamp(
-    scrollDif, -SETTINGS.maxVelocity, SETTINGS.maxVelocity);
+    userVel, -SETTINGS.maxVelocity, SETTINGS.maxVelocity);
 
   const ms = now - start;
   if (detailOpen && caseTrack) {
