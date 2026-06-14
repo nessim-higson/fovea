@@ -319,7 +319,8 @@ function currentIndex() {
 const auto = { active: false, acc: 0, idleTimer: null };
 
 function startAuto() {
-  if (SETTINGS.autoScroll && !detailOpen) auto.active = true;
+  // drifts on the home loop AND inside sub-pages (case track)
+  if (SETTINGS.autoScroll) auto.active = true;
 }
 function stopAuto(resumable = true) {
   auto.active = false;
@@ -431,6 +432,9 @@ function mountCase(i) {
   state.displacement = 0;
   ui.lens = false;
   lensBtn.textContent = 'Lens: off';
+
+  // let the sub-page auto-play too, after a beat
+  stopAuto(true);
 }
 
 // already inside: glide along the bleeding track — the visible ride
@@ -558,8 +562,9 @@ function frame(now) {
   }
   if (scrollAnim) scrollAnim(now);
 
-  // auto-scroll: accumulate fractional pixels so slow speeds stay smooth
-  if (auto.active) {
+  // auto-scroll: accumulate fractional pixels so slow speeds stay smooth.
+  // paused while a glide is animating so they don't fight.
+  if (auto.active && !scrollAnim) {
     auto.acc += SETTINGS.autoSpeed * dt / 1000;
     const whole = Math.trunc(auto.acc);
     if (whole !== 0) { window.scrollBy(0, whole); auto.acc -= whole; }
@@ -583,7 +588,7 @@ function frame(now) {
       it.mesh.position.y = -d;
       it.mat.uniforms.time.value = ms;
       it.mat.uniforms.uVel.value = vel;
-      it.mat.uniforms.uBend.value = SETTINGS.trackBend;
+      it.mat.uniforms.uBend.value = 0; // sub-pages present work flat — no bow
     });
 
     // live project derivation — the card + nav follow the scroll

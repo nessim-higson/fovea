@@ -69,11 +69,13 @@ export const EFFECTS = {
     name: 'Lens Tunnel (original)',
     params: [
       { key: 'textureScale', label: 'Distortion',  value: 0.4,  min: 0.05, max: 1,  step: 0.01 },
+      { key: 'lensOut',      label: 'Lens outward', value: 0.0,  min: 0,    max: 1,  step: 0.05 },
       { key: 'smearAmount',  label: 'Smear',       value: 1.0,  min: 0,    max: 4,  step: 0.05 },
       { key: 'smearFreq',    label: 'Smear freq',  value: 10.1, min: 1,    max: 40, step: 0.1  },
     ],
     frag: HEADER + /* glsl */`
       uniform float textureScale;
+      uniform float lensOut;       // 0 = inward tunnel, 1 = outward bulge
       uniform float smearAmount;
       uniform float smearFreq;
 
@@ -85,11 +87,16 @@ export const EFFECTS = {
         float outCircle = (0.5 - length(cVuv)) * (textureScale * 10.0);
 
         vec2 nVuv = vUv - vec2(0.5);
-        // radial magnification: zoomed out at center, zoomed in at rim
-        nVuv *= 1.0 + 0.5 * displacement - (1.0 - outCircle) * displacement * 0.5;
-        // scroll-velocity smear keyed to x-position + source luminance
+        // radial magnification. inward = center recedes / rim blows up
+        // (the tunnel); outward = its reciprocal = convex bulge toward
+        // the viewer. lensOut morphs between the two.
+        float baseScale = 1.0 + 0.5 * displacement - (1.0 - outCircle) * displacement * 0.5;
+        float scale = mix(baseScale, 1.0 / max(baseScale, 0.001), lensOut);
+        nVuv *= scale;
+        // scroll-velocity smear, gated by displacement so detail pages
+        // (lens off) stay perfectly flat
         nVuv.y *= 1.0 - sin(time * 0.001 + vUv.x * smearFreq + lum1 * smearFreq)
-                      * scrollDif * 0.01 * smearAmount;
+                      * scrollDif * 0.01 * smearAmount * displacement;
         nVuv += vec2(0.5);
 
         vec4 outColor = texture2D(tex1, nVuv);
