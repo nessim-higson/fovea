@@ -44,7 +44,8 @@ export const SETTINGS = {
 
   trackBend: 1.0,
 
-  audioSrc: './content/uniqlock/season1.m4a',  // real track — scroll bends it
+  audioSrc: null,        // procedural ambient pad — scroll bends its pitch,
+                         // opens the filter, and quickens the sparkles
   audioVolume: 0.5,
   audioWarp: 1.0,
 };

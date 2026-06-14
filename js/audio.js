@@ -268,11 +268,13 @@ export function createAudioEngine(SETTINGS) {
         whooshFilter.frequency.setTargetAtTime(400 + norm * 2600 * warp, now, 0.05);
       }
 
-      // gentle drive + filter open with speed (subtle on music)
-      const wet = Math.min(1, norm * 0.55 * warp);
+      // synth pad gets expressive grit on scroll; a real music track
+      // stays clean (heavy drive on music sounds harsh)
+      const driveMul = mediaEl ? 0.4 : 1.0;
+      const wet = Math.min(1, norm * driveMul * warp);
       wetGain.gain.setTargetAtTime(wet, now, 0.08);
       dryGain.gain.setTargetAtTime(1 - wet * 0.6, now, 0.08);
-      filter.frequency.setTargetAtTime(1100 + norm * 2200 * warp, now, 0.08);
+      filter.frequency.setTargetAtTime(1100 + norm * 2600 * warp, now, 0.08);
     },
 
     get running() { return running; },
