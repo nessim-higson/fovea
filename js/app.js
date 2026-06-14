@@ -185,18 +185,6 @@ function fitContain(item) {
   tex.offset.set(0, 0);
 }
 
-// sub-page fit: vertical & square work covers the frame (cropped to
-// fill, immersive — aspect preserved, never stretched); landscape work
-// is contained so wide pieces still read whole.
-function fitSub(item) {
-  const [iw, ih] = mediaDims(item.mat.uniforms.map.value);
-  if (iw <= ih) {
-    item.mesh.scale.set(VW, VH, 1);
-    fitCover(item);     // crop to fill
-  } else {
-    fitContain(item);   // show whole
-  }
-}
 
 /* ── the case track (detail mode) ──────────────────────────────────
    ALL projects' galleries live on ONE continuous looping track —
@@ -240,7 +228,7 @@ function buildCaseTrack() {
       mesh.visible = false;
       sceneA.add(mesh);
       const item = { mesh, mat, imgW: 1080, imgH: 1440 };
-      item.fit = () => fitSub(item);   // vertical/square crop to fill; landscape contained
+      item.fit = () => fitContain(item);   // sub-pages: whole work, undistorted
       if (isUrl) loadMedia(src, item);
       item.fit();
       items.push(item);
