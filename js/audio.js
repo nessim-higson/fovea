@@ -20,6 +20,8 @@ export function createAudioEngine(SETTINGS) {
   let oscillators = [];   // procedural mode
   let baseDetunes = [];
   let mediaEl = null;     // file mode
+  let whooshGain = null;  // scroll sound-effect layer
+  let whooshFilter = null;
   let running = false;
 
   function distortionCurve(amount) {
@@ -68,15 +70,34 @@ export function createAudioEngine(SETTINGS) {
     master.connect(analyser);
     analyser.connect(ctx.destination);
 
+    // ── scroll sound effect: a wind/whoosh that swells with scroll
+    // speed. Silent at rest. Works for both music and pad sets, so the
+    // scroll always has an audible response without warping the track.
+    const wlen = ctx.sampleRate * 2;
+    const wbuf = ctx.createBuffer(1, wlen, ctx.sampleRate);
+    const wd = wbuf.getChannelData(0);
+    for (let i = 0; i < wlen; i++) wd[i] = Math.random() * 2 - 1;
+    const wnoise = ctx.createBufferSource();
+    wnoise.buffer = wbuf; wnoise.loop = true;
+    whooshFilter = ctx.createBiquadFilter();
+    whooshFilter.type = 'bandpass';
+    whooshFilter.frequency.value = 500;
+    whooshFilter.Q.value = 1.2;
+    whooshGain = ctx.createGain();
+    whooshGain.gain.value = 0;
+    wnoise.connect(whooshFilter); whooshFilter.connect(whooshGain);
+    whooshGain.connect(master);
+    wnoise.start();
+
     if (SETTINGS.audioSrc) {
       mediaEl = new Audio(SETTINGS.audioSrc);
       mediaEl.loop = true;
       mediaEl.crossOrigin = 'anonymous';
-      // tape-style bend: vary pitch WITH rate. Also the cheap path —
-      // pitch-preserving time-stretch is very CPU-hungry when the
-      // rate changes continuously.
-      mediaEl.preservesPitch = false;
-      mediaEl.webkitPreservesPitch = false;
+      // keep the track at its true pitch — bending a melodic/rhythmic
+      // track's rate just warbles. The scroll feel comes from the
+      // whoosh layer + a gentle filter sweep instead.
+      mediaEl.preservesPitch = true;
+      mediaEl.webkitPreservesPitch = true;
       const node = ctx.createMediaElementSource(mediaEl);
       node.connect(filter);
       mediaEl.play().catch(() => {});
@@ -233,26 +254,25 @@ export function createAudioEngine(SETTINGS) {
       const norm = Math.min(Math.abs(velSigned) / maxVel, 1);
       lastNorm = norm;   // sparkle scheduler reads this
 
-      // pitch bends with scroll direction
+      // synth pad bends pitch with scroll direction (sounds good on a
+      // synth); the media track is deliberately left un-bent.
       const cents = (velSigned / maxVel) * 80 * warp;
       oscillators.forEach((o, i) => {
         o.detune.setTargetAtTime(baseDetunes[i] + cents, now, 0.08);
       });
       if (subOsc) subOsc.detune.setTargetAtTime(cents, now, 0.08);
-      if (mediaEl) {
-        // epsilon gate — rate changes reconfigure the audio pipeline,
-        // so only touch it when the value meaningfully moved
-        const rate = 1 + (velSigned / maxVel) * 0.07 * warp;
-        if (Math.abs(rate - mediaEl.playbackRate) > 0.005) {
-          mediaEl.playbackRate = rate;
-        }
+
+      // the scroll sound effect: whoosh swells + brightens with speed
+      if (whooshGain) {
+        whooshGain.gain.setTargetAtTime(norm * 0.18 * warp, now, 0.05);
+        whooshFilter.frequency.setTargetAtTime(400 + norm * 2600 * warp, now, 0.05);
       }
 
-      // drive + filter open with speed
-      const wet = Math.min(1, norm * 1.4 * warp);
+      // gentle drive + filter open with speed (subtle on music)
+      const wet = Math.min(1, norm * 0.55 * warp);
       wetGain.gain.setTargetAtTime(wet, now, 0.08);
       dryGain.gain.setTargetAtTime(1 - wet * 0.6, now, 0.08);
-      filter.frequency.setTargetAtTime(1100 + norm * 2600 * warp, now, 0.08);
+      filter.frequency.setTargetAtTime(1100 + norm * 2200 * warp, now, 0.08);
     },
 
     get running() { return running; },

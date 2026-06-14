@@ -93,10 +93,10 @@ export const EFFECTS = {
         float baseScale = 1.0 + 0.5 * displacement - (1.0 - outCircle) * displacement * 0.5;
         float scale = mix(baseScale, 1.0 / max(baseScale, 0.001), lensOut);
         nVuv *= scale;
-        // scroll-velocity smear, gated by displacement so detail pages
-        // (lens off) stay perfectly flat
+        // scroll-velocity smear — runs everywhere (incl. detail pages),
+        // keyed to scroll speed so it's zero at rest, alive on scroll
         nVuv.y *= 1.0 - sin(time * 0.001 + vUv.x * smearFreq + lum1 * smearFreq)
-                      * scrollDif * 0.01 * smearAmount * displacement;
+                      * scrollDif * 0.01 * smearAmount;
         nVuv += vec2(0.5);
 
         vec4 outColor = texture2D(tex1, nVuv);

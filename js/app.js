@@ -112,7 +112,7 @@ function loadMedia(src, holder) {
       const t = new THREE.VideoTexture(v);
       t.colorSpace = THREE.SRGBColorSpace;
       holder.mat.uniforms.map.value = t;
-      fitCover(holder);
+      holder.fit();
     });
     v.play().catch(() => {});
   } else {
@@ -121,7 +121,7 @@ function loadMedia(src, holder) {
       holder.mat.uniforms.map.value = t;
       holder.imgW = t.image.naturalWidth;
       holder.imgH = t.image.naturalHeight;
-      fitCover(holder);
+      holder.fit();
     });
   }
 }
@@ -143,19 +143,47 @@ const slides = PROJECTS.map((p, i) => {
   const mesh = new THREE.Mesh(planeGeo, mat);
   sceneA.add(mesh);
   const slide = { mesh, mat, imgW: 1080, imgH: 1440 };
+  slide.fit = () => fitCover(slide);   // home = full-bleed immersive
   if (p.image) loadMedia(p.image, slide);
   return slide;
 });
 
 // cover-fit a texture to the viewport-sized plane via UV transform
+// read the REAL pixel dims off whatever texture is mounted right now —
+// images, videos, and canvases all differ, and reading live avoids the
+// stale-cached-dimension bug that squished landscape stills.
+function mediaDims(tex) {
+  const im = tex && tex.image;
+  if (!im) return [1, 1];
+  const w = im.naturalWidth || im.videoWidth || im.width || 1;
+  const h = im.naturalHeight || im.videoHeight || im.height || 1;
+  return [w, h];
+}
+
 function fitCover(slide) {
   const tex = slide.mat.uniforms.map.value;
-  const s = Math.max(VW / slide.imgW, VH / slide.imgH);
-  const visW = VW / (slide.imgW * s);
-  const visH = VH / (slide.imgH * s);
+  const [iw, ih] = mediaDims(tex);
+  const s = Math.max(VW / iw, VH / ih);
+  const visW = VW / (iw * s);
+  const visH = VH / (ih * s);
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.center.set(0.5, 0.5);
   tex.repeat.set(visW, visH);
   tex.offset.set((1 - visW) / 2, (1 - visH) / 2);
+}
+
+// contain-fit: scale the MESH to the media's aspect so the WHOLE work
+// shows, never cropped or stretched. Used in sub-pages (case studies)
+// so portfolio images present cleanly.
+function fitContain(item) {
+  const tex = item.mat.uniforms.map.value;
+  const [iw, ih] = mediaDims(tex);
+  const s = Math.min(VW / iw, VH / ih);
+  item.mesh.scale.set(iw * s, ih * s, 1);
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.center.set(0.5, 0.5);
+  tex.repeat.set(1, 1);
+  tex.offset.set(0, 0);
 }
 
 /* ── the case track (detail mode) ──────────────────────────────────
@@ -200,14 +228,15 @@ function buildCaseTrack() {
       mesh.visible = false;
       sceneA.add(mesh);
       const item = { mesh, mat, imgW: 1080, imgH: 1440 };
+      item.fit = () => fitContain(item);   // sub-pages = whole work, no crop
       if (isUrl) loadMedia(src, item);
-      mesh.scale.set(VW, VH, 1);
-      fitCover(item);
+      item.fit();
       items.push(item);
     });
   });
 
   caseTrack = { items, starts, N: items.length };
+  window.__caseTrack = caseTrack;
   return caseTrack;
 }
 
@@ -269,9 +298,9 @@ function layout() {
     cam.updateProjectionMatrix();
   }
   lensQuad.scale.set(VW, VH, 1);
-  slides.forEach(s => { s.mesh.scale.set(VW, VH, 1); fitCover(s); });
+  slides.forEach(s => { s.mesh.scale.set(VW, VH, 1); s.fit(); });
   if (caseTrack) {
-    caseTrack.items.forEach(it => { it.mesh.scale.set(VW, VH, 1); fitCover(it); });
+    caseTrack.items.forEach(it => it.fit());
   }
   spacer.style.height = detailOpen && caseTrack
     ? (CASE_LOOPS * caseTrack.N * VH) + 'px'
