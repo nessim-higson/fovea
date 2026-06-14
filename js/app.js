@@ -173,8 +173,7 @@ function fitCover(slide) {
 }
 
 // contain-fit: scale the MESH to the media's aspect so the WHOLE work
-// shows, never cropped or stretched. Used in sub-pages (case studies)
-// so portfolio images present cleanly.
+// shows, never cropped or stretched.
 function fitContain(item) {
   const tex = item.mat.uniforms.map.value;
   const [iw, ih] = mediaDims(tex);
@@ -184,6 +183,19 @@ function fitContain(item) {
   tex.center.set(0.5, 0.5);
   tex.repeat.set(1, 1);
   tex.offset.set(0, 0);
+}
+
+// sub-page fit: vertical & square work covers the frame (cropped to
+// fill, immersive — aspect preserved, never stretched); landscape work
+// is contained so wide pieces still read whole.
+function fitSub(item) {
+  const [iw, ih] = mediaDims(item.mat.uniforms.map.value);
+  if (iw <= ih) {
+    item.mesh.scale.set(VW, VH, 1);
+    fitCover(item);     // crop to fill
+  } else {
+    fitContain(item);   // show whole
+  }
 }
 
 /* ── the case track (detail mode) ──────────────────────────────────
@@ -228,7 +240,7 @@ function buildCaseTrack() {
       mesh.visible = false;
       sceneA.add(mesh);
       const item = { mesh, mat, imgW: 1080, imgH: 1440 };
-      item.fit = () => fitContain(item);   // sub-pages = whole work, no crop
+      item.fit = () => fitSub(item);   // vertical/square crop to fill; landscape contained
       if (isUrl) loadMedia(src, item);
       item.fit();
       items.push(item);
