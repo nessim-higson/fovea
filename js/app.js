@@ -32,6 +32,7 @@ const detailEl = document.getElementById('detail');
 const detailX  = document.getElementById('detail-x');
 const metaEl   = document.getElementById('detail-meta');
 const descEl   = document.getElementById('detail-desc');
+const beatDot  = document.getElementById('beat-dot');
 
 // detail mode state (declared early — layout() runs at module load)
 let detailOpen = false;
@@ -295,6 +296,7 @@ function baseUniforms() {
     saturation:   { value: 1 },
     displacement: { value: 0 },
     scrollDif:    { value: 0 },
+    uBeat:        { value: 0 },
   };
 }
 
@@ -616,6 +618,13 @@ gui.add(SETTINGS, 'audioVolume', 0, 1, 0.01).name('Volume')
   .onChange(v => audio.setVolume(v));
 gui.add(SETTINGS, 'audioWarp', 0, 3, 0.05).name('Audio warp');
 
+const beatFolder = gui.addFolder('Clock beat');
+beatFolder.add(SETTINGS, 'beat').name('Beat on');
+beatFolder.add(SETTINGS, 'bpm', 20, 240, 1).name('BPM (60 = secs)');
+beatFolder.add(SETTINGS, 'beatAmount', 0, 3, 0.05).name('Pulse');
+beatFolder.add(SETTINGS, 'beatSharp', 1, 10, 0.5).name('Sharpness');
+beatFolder.add(SETTINGS, 'beatStep', 0, 400, 5).name('Tick step (px)');
+
 let paramsFolder = null;
 function rebuildParamsFolder() {
   if (paramsFolder) paramsFolder.destroy();
@@ -645,22 +654,42 @@ window.__vel = () => userVel;
 /* ── render loop ───────────────────────────────────────────────────── */
 const start = performance.now();
 let lastNow = start;
+let lastBeatPhase = 0, beatStepRemaining = 0;
 function frame(now) {
   const dt = Math.min(now - lastNow, 100); // clamp tab-switch gaps
   lastNow = now;
+
+  // ── clock beat (UNIQLOCK tempo) ─────────────────────────────────────
+  // a pulse on every beat; at 60 BPM that's one per real clock second.
+  const beatPeriod = 60000 / (SETTINGS.bpm || 60);
+  const beatPhase = (Date.now() % beatPeriod) / beatPeriod;  // 0..1 each beat
+  const newBeat = beatPhase < lastBeatPhase;                 // wrapped → a tick
+  lastBeatPhase = beatPhase;
+  const beatEnv = Math.pow(1 - beatPhase, SETTINGS.beatSharp || 4); // spike at tick
+  const beat = SETTINGS.beat ? beatEnv * (SETTINGS.beatAmount ?? 1) : 0;
 
   for (const k of Object.keys(tweens)) {
     if (!tweens[k](now)) delete tweens[k];
   }
   if (scrollAnim) scrollAnim(now);
 
-  // auto-scroll: accumulate fractional pixels so slow speeds stay smooth.
-  // paused while a glide is animating so they don't fight.
+  // auto-advance: either a smooth drift, or — in beat mode — a tick that
+  // steps the filmstrip forward in time with the seconds (eased out).
   let autoWhole = 0;
   if (auto.active && !scrollAnim) {
-    auto.acc += SETTINGS.autoSpeed * dt / 1000;
-    autoWhole = Math.trunc(auto.acc);
-    if (autoWhole !== 0) { window.scrollBy(0, autoWhole); auto.acc -= autoWhole; }
+    if (SETTINGS.beat && SETTINGS.beatStep > 0) {
+      if (newBeat) beatStepRemaining = SETTINGS.beatStep;
+      if (beatStepRemaining > 0.5) {
+        const px = Math.max(1, Math.round(beatStepRemaining * 0.18));
+        window.scrollBy(0, px);
+        beatStepRemaining -= px;
+        autoWhole = px;                 // counted as auto so it doesn't smear
+      }
+    } else {
+      auto.acc += SETTINGS.autoSpeed * dt / 1000;
+      autoWhole = Math.trunc(auto.acc);
+      if (autoWhole !== 0) { window.scrollBy(0, autoWhole); auto.acc -= autoWhole; }
+    }
   }
 
   // slide positions follow the TOTAL scroll (auto + user + glide).
@@ -726,6 +755,14 @@ function frame(now) {
   u.opacity.value = state.opacity;
   u.saturation.value = state.saturation;
   u.scrollDif.value = vel;
+  u.uBeat.value = beat;
+
+  // beat zoom-punch on the output (effect-agnostic — works lens on/off,
+  // home or sub-page) + the blinking beat dot.
+  camB.zoom = 1 + beat * 0.045;
+  camB.updateProjectionMatrix();
+  beatDot.style.transform = 'scale(' + (1 + beat * 1.1).toFixed(3) + ')';
+  beatDot.style.opacity = (0.18 + beat * 0.82).toFixed(3);
 
   renderer.setRenderTarget(rt);
   renderer.clear();

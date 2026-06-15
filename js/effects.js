@@ -39,6 +39,7 @@ const HEADER = /* glsl */`
   uniform float saturation;
   uniform float displacement;
   uniform float scrollDif;
+  uniform float uBeat;     // clock-beat pulse (0..1), spikes each beat
 `;
 
 // safe-area helper: 0 in the middle band, 1 at top/bottom edges
@@ -99,7 +100,15 @@ export const EFFECTS = {
                       * scrollDif * 0.01 * smearAmount;
         nVuv += vec2(0.5);
 
-        vec4 outColor = texture2D(tex1, nVuv);
+        // clock-beat chroma kick: RGB splits radially on every beat
+        vec2 bdir = (nVuv - 0.5) / max(length(nVuv - 0.5), 1e-4);
+        float ca = uBeat * 0.006;
+        vec4 outColor = vec4(
+          texture2D(tex1, nVuv + bdir * ca).r,
+          texture2D(tex1, nVuv).g,
+          texture2D(tex1, nVuv - bdir * ca).b,
+          1.0
+        );
         ${FINISH}
       }
     `,

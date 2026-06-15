@@ -151,3 +151,13 @@ body::-webkit-scrollbar { display: none; }
   border-radius: 999px;
   opacity: 0.55;
 }
+
+/* clock-beat indicator — pulses on every second (scale/opacity set in JS) */
+.beat-dot {
+  position: absolute; right: 18px; top: 46px;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0.25;
+  will-change: transform, opacity;
+}
