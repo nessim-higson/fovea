@@ -126,13 +126,20 @@ function loadMedia(src, holder) {
   }
 }
 
+// 1×1 black placeholder shown until real media streams in — so a real
+// content set loads as clean void, never flashing the procedural temp
+// posters (those only exist to fill the no-content default set).
+const BLACK_TEX = new THREE.DataTexture(
+  new Uint8Array([0, 0, 0, 255]), 1, 1, THREE.RGBAFormat);
+BLACK_TEX.needsUpdate = true;
+
 const planeGeo = new THREE.PlaneGeometry(1, 1, 32, 32);
 const slides = PROJECTS.map((p, i) => {
   const mat = new THREE.ShaderMaterial({
     vertexShader: slideVert,
     fragmentShader: imageFrag,
     uniforms: {
-      map:        { value: makePoster(i, p) },
+      map:        { value: p.image ? BLACK_TEX : makePoster(i, p) },
       time:       { value: 0 },
       detailMode: { value: 1 },
       opacity:    { value: 1 },
@@ -223,7 +230,7 @@ function buildCaseTrack() {
 
     sources.forEach((src) => {
       const isUrl = typeof src === 'string';
-      const mat = makeSlideMaterial(isUrl ? makePoster(i, project) : src);
+      const mat = makeSlideMaterial(isUrl ? BLACK_TEX : src);
       const mesh = new THREE.Mesh(planeGeo, mat);
       mesh.visible = false;
       sceneA.add(mesh);
