@@ -43,7 +43,7 @@ const renderer = new THREE.WebGLRenderer({
 });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-let VW = window.innerWidth, VH = window.innerHeight;
+let VW = 0, VH = 0;   // set by layout() (which runs immediately below)
 
 const camA = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
 const camB = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
@@ -53,8 +53,7 @@ const sceneA = new THREE.Scene();
 sceneA.background = new THREE.Color(0x000000);
 const sceneB = new THREE.Scene();
 
-const rt = new THREE.WebGLRenderTarget(
-  VW * renderer.getPixelRatio(), VH * renderer.getPixelRatio());
+const rt = new THREE.WebGLRenderTarget(1, 1);  // sized in layout()
 
 /* ── image track ───────────────────────────────────────────────────
    Each slide is a segmented plane so the TRACK BEND vertex shader can
@@ -321,8 +320,29 @@ function setEffect(id) {
 const LOOPS = 6;
 function cycleH() { return PROJECTS.length * VH; }
 
+// On touch devices the OS already provides smooth momentum scrolling, so
+// the extra position-smoothing only adds lag — and on a hard flick the
+// lagged value has to finish catching up in the OLD direction before it
+// reverses, which reads as a "blip" when you change scroll direction.
+// Lock the render position to the real scroll on touch; keep the
+// weighted glide on desktop (where wheel input is steppy and benefits).
+// primary pointer is coarse → phone/tablet (true touch-scroll device with
+// an address bar). a touchscreen laptop keeps a fine primary pointer, so
+// it correctly stays on the desktop path.
+const IS_TOUCH = matchMedia('(pointer: coarse)').matches;
+
 function layout() {
-  VW = window.innerWidth; VH = window.innerHeight;
+  const w = window.innerWidth;
+  let h = window.innerHeight;
+  // ignore the mobile address-bar height shrink (same width, smaller
+  // height): relaying out on it would jump the content as the bar
+  // reappears on a direction reversal. only grow the height, or relayout
+  // fully on a width / orientation change.
+  if (IS_TOUCH && VW && w === VW) {
+    h = Math.max(VH, h);
+    if (h === VH) return;
+  }
+  VW = w; VH = h;
   renderer.setSize(VW, VH);
   rt.setSize(VW * renderer.getPixelRatio(), VH * renderer.getPixelRatio());
   for (const cam of [camA, camB]) {
@@ -643,8 +663,11 @@ function frame(now) {
     if (autoWhole !== 0) { window.scrollBy(0, autoWhole); auto.acc -= autoWhole; }
   }
 
-  // slide positions follow the TOTAL scroll (auto + user + glide)
-  smooth += (window.scrollY - smooth) * SETTINGS.smoothLerp;
+  // slide positions follow the TOTAL scroll (auto + user + glide).
+  // touch: lock to the real scroll (no lag, no direction-reversal blip,
+  // and rebase teleports stay perfectly seamless). desktop: weighted glide.
+  if (IS_TOUCH) smooth = window.scrollY;
+  else smooth += (window.scrollY - smooth) * SETTINGS.smoothLerp;
   lastSmooth = smooth;
 
   // distortion velocity follows USER scroll only — subtract the auto
