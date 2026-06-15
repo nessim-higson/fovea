@@ -11,6 +11,10 @@ html, body {
   font-family: "SF Mono", ui-monospace, Menlo, monospace;
   font-size: 11px;
   letter-spacing: 0.08em;
+  /* kill mobile pull-to-refresh + overscroll bounce/chaining — a hard
+     flick used to reach the top edge and reload the page (landing on a
+     different image). overscroll-behavior:none keeps the loop seamless. */
+  overscroll-behavior: none;
 }
 
 /* hide scrollbar, keep native scroll (same trick as the reference site) */
