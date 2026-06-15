@@ -1,4 +1,6 @@
-# Studio Site
+# FOVEA
+
+*The sharpest point of vision — the edges blur, the center holds.*
 
 A portfolio site built around a single WebGL canvas — project images live
 as textures on stacked planes, native page scroll moves the stack, and a
