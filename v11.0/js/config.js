@@ -1,44 +1,50 @@
 // ═══════════════════════════════════════════════════════════════════
-// CONFIG — the two things you edit when plugging in real work.
+// FOVEA — frozen V.11 snapshot (pre-clock-beat engine), FOVEA-named
+// default content. Bare /v11.0/ loads this; ?set=fovea / ?set=uniqlock
+// alias it.
 // ═══════════════════════════════════════════════════════════════════
 
 export const SITE = {
-  studio: 'STUDIO of [YOUR NAME]',
+  studio: 'FOVEA',
   tagline: 'Creative Direction & Design',
 };
 
-// image:  CORS-enabled URL for the home-track cover, or null for a
-//         procedural placeholder poster.
-// images: array of CORS-enabled URLs for the project's detail gallery
-//         (long scroll). Omit to get 5 generated placeholder shots.
+const IMG = (n) => `../content/uniqlock/img/${String(n).padStart(2, '0')}.jpg`;
+const range = (a, b) => Array.from({ length: b - a + 1 }, (_, k) => IMG(a + k));
+const REEL = '../content/uniqlock/reel.mp4';
+
 export const PROJECTS = [
-  { client: 'ACME',      title: 'Brand System',    year: 2025, image: null,
-    description: 'Full identity program: marks, type system, motion principles and rollout guidelines.' },
-  { client: 'HELIOS',    title: 'Launch Campaign', year: 2025, image: null,
-    description: 'Global launch campaign across film, OOH and social — concept to delivery.' },
-  { client: 'NORTHSTAR', title: 'Site Redesign',   year: 2024, image: null,
-    description: 'Editorial-led web experience with a custom WebGL navigation system.' },
-  { client: 'MARU',      title: 'Editorial',       year: 2024, image: null,
-    description: 'Art direction and layout system for a quarterly print publication.' },
-  { client: 'FORMA',     title: 'Film Direction',  year: 2023, image: null,
-    description: 'Direction and grade for a three-part brand film series.' },
+  { client: 'BEATCUT', title: 'Tempo Study', year: 2026,
+    image: IMG(0), images: range(0, 7),
+    description: 'Cutting to the clock — five-minute music as an editing grid.' },
+  { client: 'SWEEP', title: 'Second Hand Suite', year: 2026,
+    image: IMG(8), images: range(8, 15),
+    description: 'The sweep of a second hand traced through movement and blur.' },
+  { client: 'HANDS', title: 'Clockwork Portraits', year: 2026,
+    image: IMG(16), images: range(16, 23),
+    description: 'Bodies as clock hands — choreography on a twelve-point dial.' },
+  { client: 'ZRUSH', title: 'Depth Rush', year: 2026,
+    image: IMG(24), images: range(24, 31),
+    description: 'Zoom-rush studies: the dial as a tunnel, time as velocity.' },
+  { client: 'NEVVERLAND', title: 'Reel', year: 2026,
+    image: REEL, images: [REEL, ...range(32, 39)],
+    description: 'The nevverland reel — the living clock cut to music, in motion.' },
 ];
 
-// Global motion settings (all live-tweakable from the G panel too).
 export const SETTINGS = {
-  effect: 'lens-tunnel', // starting pass — see js/effects.js
-  scrollLerp: 0.05,      // velocity smoothing (recovered from reference site)
-  smoothLerp: 0.1,       // scroll position smoothing
-  maxVelocity: 40,       // clamp on scroll velocity fed to shaders
+  effect: 'lens-tunnel',
+  scrollLerp: 0.05,
+  smoothLerp: 0.1,
+  maxVelocity: 40,
 
-  autoScroll: true,      // drift through projects on load
-  autoSpeed: 60,         // px/second
-  autoResume: 2,         // resume after N idle seconds (0 = never)
+  autoScroll: true,
+  autoSpeed: 60,
+  autoResume: 2,
 
-  trackBend: 1.0,        // how much the slide track bows with scroll velocity
+  trackBend: 1.0,
 
-  audioSrc: null,        // mp3/stream URL for the ambient track, or null
-                         // for the procedural pad (no asset needed)
-  audioVolume: 0.5,      // 0..1
-  audioWarp: 1.0,        // how hard scroll velocity warps the audio
+  audioSrc: null,        // procedural ambient pad — scroll bends its pitch,
+                         // opens the filter, and quickens the sparkles
+  audioVolume: 0.5,
+  audioWarp: 1.0,
 };
