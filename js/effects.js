@@ -40,6 +40,7 @@ const HEADER = /* glsl */`
   uniform float displacement;
   uniform float scrollDif;
   uniform float uBeat;     // clock-beat pulse (0..1), spikes each beat
+  uniform vec2  uMouse;    // smoothed cursor (-1..1)
 `;
 
 // safe-area helper: 0 in the middle band, 1 at top/bottom edges
@@ -502,6 +503,53 @@ export const EFFECTS = {
         vec2 refr = (vec2(n) - 0.5) * 0.012 * m;
         vec4 outColor = texture2D(tex1, vUv + refr);
         outColor.rgb += ca * caBright * 0.6 * m;       // luminous overlay
+        ${FINISH}
+      }
+    `,
+  },
+
+  /* 13. Relief — the image's own luminance is read as a 3D heightmap:
+        bright = raised. A parallax ray (cursor + scroll) shifts the
+        surface so it pops in depth, and a raking specular highlight
+        lights the relief. Compound + content-aware, like the lens. */
+  'relief': {
+    name: 'Relief (depth)',
+    params: [
+      { key: 'depthAmt',    label: 'Depth',  value: 1.2, min: 0, max: 3,  step: 0.05 },
+      { key: 'reliefSteps', label: 'Steps',  value: 12,  min: 2, max: 24, step: 1    },
+      { key: 'shine',       label: 'Shine',  value: 0.6, min: 0, max: 2,  step: 0.05 },
+    ],
+    frag: HEADER + /* glsl */`
+      uniform float depthAmt;
+      uniform float reliefSteps;
+      uniform float shine;
+
+      float lum(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
+
+      void main() {
+        float m = displacement;   // depth across the WHOLE frame, not just edges
+        float vel = clamp(scrollDif, -40.0, 40.0);
+        // view ray from the cursor (+ a little scroll drift)
+        vec2 view = (uMouse * 0.7 + vec2(0.0, vel * 0.02)) * depthAmt * 0.06 * m;
+
+        // march the ray through the luminance heightmap — bright lifts more
+        vec2 uv = vUv;
+        for (int i = 0; i < 24; i++) {
+          if (float(i) >= reliefSteps) break;
+          float h = lum(texture2D(tex1, uv).rgb);
+          uv += view * h / reliefSteps;
+        }
+        vec4 outColor = texture2D(tex1, uv);
+
+        // raking specular: a highlight that sweeps across the relief as
+        // the cursor/scroll moves, so it reads as a lit 3D surface
+        float c  = lum(texture2D(tex1, uv).rgb);
+        float cx = lum(texture2D(tex1, uv + vec2(0.004, 0.0)).rgb);
+        float cy = lum(texture2D(tex1, uv + vec2(0.0, 0.004)).rgb);
+        vec3 normal = normalize(vec3(c - cx, c - cy, 0.18));
+        vec3 lightDir = normalize(vec3(uMouse * 0.8, 0.6));
+        float spec = pow(max(dot(normal, lightDir), 0.0), 12.0) * shine * m;
+        outColor.rgb += spec;
         ${FINISH}
       }
     `,

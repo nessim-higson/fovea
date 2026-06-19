@@ -53,7 +53,7 @@ export const SETTINGS = {
   // ── EXPERIMENT: clock-beat motion (UNIQLOCK tempo) ──────────────────
   // the site pulses with the seconds: a zoom+chroma punch on every beat,
   // the filmstrip ticks forward in time, and a beat dot blinks along.
-  beat: true,            // master on/off
+  beat: false,           // master on/off (clock tick removed by default)
   bpm: 60,               // 60 = one beat per real clock second
   beatAmount: 1.0,       // zoom-pulse intensity
   beatSharp: 4.0,        // pulse attack sharpness (higher = snappier)

@@ -297,6 +297,7 @@ function baseUniforms() {
     displacement: { value: 0 },
     scrollDif:    { value: 0 },
     uBeat:        { value: 0 },
+    uMouse:       { value: new THREE.Vector2(0, 0) },
   };
 }
 
@@ -332,6 +333,14 @@ function cycleH() { return PROJECTS.length * VH; }
 // an address bar). a touchscreen laptop keeps a fine primary pointer, so
 // it correctly stays on the desktop path.
 const IS_TOUCH = matchMedia('(pointer: coarse)').matches;
+
+// smoothed cursor (-1..1), drives the parallax in the depth effect
+const mouseTarget = new THREE.Vector2(0, 0);
+const mouseSmooth = new THREE.Vector2(0, 0);
+window.addEventListener('pointermove', (e) => {
+  mouseTarget.set((e.clientX / window.innerWidth) * 2 - 1,
+                  -((e.clientY / window.innerHeight) * 2 - 1));
+});
 
 function layout() {
   const w = window.innerWidth;
@@ -650,6 +659,15 @@ window.__closeDetail = closeDetail;
 window.__audio = audio;
 window.__state = state;
 window.__vel = () => userVel;
+// render one representative frame on demand (home state) — lets a paused/
+// hidden tab still be screenshotted for verification.
+window.__snap = (eff) => {
+  if (eff) { sel.effect = eff; setEffect(eff); }
+  for (const k of Object.keys(tweens)) delete tweens[k];
+  state.displacement = 1; state.opacity = 1; state.saturation = 1;
+  frame(performance.now());
+  return sel.effect;
+};
 
 /* ── render loop ───────────────────────────────────────────────────── */
 const start = performance.now();
@@ -756,13 +774,15 @@ function frame(now) {
   u.saturation.value = state.saturation;
   u.scrollDif.value = vel;
   u.uBeat.value = beat;
+  mouseSmooth.lerp(mouseTarget, 0.08);
+  u.uMouse.value.copy(mouseSmooth);
 
   // beat zoom-punch on the output (effect-agnostic — works lens on/off,
   // home or sub-page) + the blinking beat dot.
   camB.zoom = 1 + beat * 0.045;
   camB.updateProjectionMatrix();
   beatDot.style.transform = 'scale(' + (1 + beat * 1.1).toFixed(3) + ')';
-  beatDot.style.opacity = (0.18 + beat * 0.82).toFixed(3);
+  beatDot.style.opacity = SETTINGS.beat ? (0.18 + beat * 0.82).toFixed(3) : '0';
 
   renderer.setRenderTarget(rt);
   renderer.clear();
