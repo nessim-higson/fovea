@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FOVEA</title>
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+<div id="spacer"></div>
+
+<div class="overlay">
+  <div class="pill" id="pill"></div>
+
+  <div class="detail" id="detail" hidden>
+    <button class="detail-x" id="detail-x" aria-label="Close project">&#10005;</button>
+    <div class="detail-meta" id="detail-meta"></div>
+    <p class="detail-desc" id="detail-desc"></p>
+  </div>
+
+  <nav class="projnav" id="projnav" aria-label="Projects"></nav>
+  <button class="lens-btn" id="lens-btn">Lens: on</button>
+  <button class="sound-btn" id="sound-btn">Sound: off</button>
+  <div class="hint">G — effects panel</div>
+  <div class="version" id="version">V.15</div>
+  <div class="beat-dot" id="beat-dot" aria-hidden="true"></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://esm.sh/three@0.160.0",
+    "lil-gui": "https://esm.sh/lil-gui@0.19.2"
+  }
+}
+</script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
