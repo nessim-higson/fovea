@@ -1,0 +1,183 @@
+/* ═══════════════════════════════════════════════════════════════════
+   STUDIO SITE — base styles
+   The page is one WebGL canvas; DOM is overlay text only.
+   ═══════════════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: #000;
+  color: #fff;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  /* kill mobile pull-to-refresh + overscroll bounce/chaining — a hard
+     flick used to reach the top edge and reload the page (landing on a
+     different image). overscroll-behavior:none keeps the loop seamless. */
+  overscroll-behavior: none;
+}
+
+/* hide scrollbar, keep native scroll (same trick as the reference site) */
+html { scrollbar-width: none; }
+body::-webkit-scrollbar { display: none; }
+
+#gl { position: fixed; inset: 0; z-index: 1; display: block; }
+
+/* native-scroll spacer: gives the page real height to scroll */
+#spacer { position: relative; width: 100%; }
+
+.overlay { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
+.overlay > * { pointer-events: auto; }
+
+/* studio pill — top-left corner */
+.pill {
+  position: absolute; left: 14px; top: 13px;
+  padding: 7px 13px;
+  text-align: left;
+  text-transform: uppercase;
+  line-height: 1.55;
+  background: rgba(0,0,0,0.22);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 11px;
+  user-select: none;
+}
+.pill b { font-weight: 700; }
+
+/* category tabs — bottom-centre */
+.cat-tabs {
+  position: absolute; left: 50%; bottom: 14px;
+  transform: translateX(-50%);
+  display: flex; gap: 6px;
+  padding: 4px;
+  background: rgba(0,0,0,0.25);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 999px;
+}
+.cat-tabs:empty { display: none; }
+.cat-tabs button {
+  padding: 5px 14px;
+  text-transform: uppercase;
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  border: 0; font: inherit; letter-spacing: inherit;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+}
+.cat-tabs button:hover { color: #fff; }
+.cat-tabs button.active { color: #000; background: #fff; }
+
+/* live project rail — right edge, current highlighted */
+.rail {
+  position: absolute; right: 14px; top: 50%;
+  transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: 1px;
+  max-height: 70vh;
+  overflow-y: auto;
+  text-align: right;
+  scrollbar-width: none;
+}
+.rail::-webkit-scrollbar { display: none; }
+.rail button {
+  padding: 2px 2px;
+  text-transform: uppercase;
+  background: transparent;
+  color: rgba(255,255,255,0.55);
+  border: 0; font: inherit; letter-spacing: 0.08em; font-size: 10px;
+  cursor: pointer; white-space: nowrap;
+  transition: color 150ms;
+  text-align: right;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.8);
+}
+.rail button:hover { color: rgba(255,255,255,0.85); }
+.rail button.active { color: #fff; }
+.rail button.active::after { content: ' ◂'; color: #fff; }
+
+/* project detail panel */
+.detail {
+  position: absolute; left: 50%; bottom: 64px;
+  transform: translateX(-50%);
+  width: min(92%, 440px);
+  padding: 16px 44px 16px 18px;
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+}
+.detail[hidden] { display: none; }
+.detail-meta {
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.detail-desc {
+  margin-top: 8px;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.75);
+}
+.detail-x {
+  position: absolute; top: 10px; right: 10px;
+  width: 26px; height: 26px;
+  background: rgba(255,255,255,0.12);
+  color: #fff; border: 0; font: inherit;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.detail-x:hover { background: rgba(255,255,255,0.25); }
+
+.lens-btn {
+  position: absolute; left: 14px; bottom: 14px;
+  padding: 6px 14px;
+  text-transform: uppercase;
+  background: rgba(0,0,0,0.25);
+  color: #fff; border: 0; font: inherit; letter-spacing: inherit;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.lens-btn:hover { background: rgba(255,255,255,0.15); }
+
+.sound-btn {
+  position: absolute; left: 14px; bottom: 52px;
+  padding: 6px 14px;
+  text-transform: uppercase;
+  background: rgba(0,0,0,0.25);
+  color: #fff; border: 0; font: inherit; letter-spacing: inherit;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.sound-btn:hover { background: rgba(255,255,255,0.15); }
+.sound-btn.on { background: #fff; color: #000; }
+
+.hint {
+  position: absolute; right: 14px; bottom: 14px;
+  padding: 6px 0;
+  text-transform: uppercase;
+  opacity: 0.45;
+}
+
+.version {
+  position: absolute; right: 14px; top: 14px;
+  padding: 4px 10px;
+  letter-spacing: 0.18em;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 999px;
+  opacity: 0.55;
+}
+
+/* clock-beat indicator — pulses on every second (scale/opacity set in JS) */
+.beat-dot {
+  position: absolute; right: 18px; top: 46px;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0.25;
+  will-change: transform, opacity;
+}
