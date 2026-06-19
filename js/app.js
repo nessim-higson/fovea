@@ -34,6 +34,8 @@ const detailX  = document.getElementById('detail-x');
 const metaEl   = document.getElementById('detail-meta');
 const descEl   = document.getElementById('detail-desc');
 const beatDot  = document.getElementById('beat-dot');
+const metroEl  = document.getElementById('metro');
+document.getElementById('metro-label').textContent = SITE.studio;
 
 // detail mode state (declared early — layout() runs at module load)
 let detailOpen = false;
@@ -424,8 +426,15 @@ function currentIndex() {
 /* ── auto-scroll: drift on load, yield to the visitor, resume on idle ── */
 const auto = { active: false, acc: 0, idleTimer: null };
 
+/* the IAAH square is a visible metronome: it turns proportional to the TOTAL
+   scroll movement (auto-drift + manual), so it spins steadily while the page
+   auto-plays and quickly on a fast scroll. Clicking it pauses that motion. */
+const METRO_DEG_PER_PX = 0.6;
+let metroDeg = 0, metroPaused = false;
+
 function startAuto() {
   // drifts on the home loop AND inside sub-pages (case track)
+  if (metroPaused) return;            // square is manually paused — stay still
   if (SETTINGS.autoScroll) auto.active = true;
 }
 function stopAuto(resumable = true) {
@@ -437,6 +446,16 @@ function stopAuto(resumable = true) {
   }
 }
 setTimeout(startAuto, 2500); // let the intro tweens land first
+
+// click the square to stop / resume the motion — works on the home lens view
+// and inside a project (the case track), since both ride the same auto-drift.
+metroEl.addEventListener('click', () => {
+  metroPaused = !metroPaused;
+  metroEl.classList.toggle('paused', metroPaused);
+  metroEl.setAttribute('aria-label', metroPaused ? 'Resume motion' : 'Pause motion');
+  if (metroPaused) stopAuto(false);   // hard stop, no idle resume
+  else startAuto();
+});
 
 for (const ev of ['wheel', 'touchstart']) {
   window.addEventListener(ev, () => stopAuto(), { passive: true });
@@ -770,6 +789,14 @@ function frame(now) {
   const userDelta = (curY - prevY) - autoWhole;
   prevY = curY;
   userVel += (userDelta - userVel) * SETTINGS.scrollLerp;
+
+  // turn the IAAH square with the TOTAL motion (auto-drift + manual scroll).
+  // (autoWhole + userDelta == this frame's scroll, rebase-safe via prevY.)
+  const metroMove = autoWhole + userDelta;
+  if (metroMove) {
+    metroDeg = (metroDeg + metroMove * METRO_DEG_PER_PX) % 360;
+    metroEl.style.transform = 'rotate(' + metroDeg.toFixed(2) + 'deg)';
+  }
 
   const vel = THREE.MathUtils.clamp(
     userVel, -SETTINGS.maxVelocity, SETTINGS.maxVelocity);
