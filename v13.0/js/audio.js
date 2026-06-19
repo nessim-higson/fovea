@@ -1,0 +1,299 @@
+// ═══════════════════════════════════════════════════════════════════
+// AUDIO — ambient engine with scroll-driven warp.
+//
+// Graph:  source ─→ lowpass filter ─→ dry ──────────┐
+//                            └──→ waveshaper → wet ─┤→ master → out
+//                            └──→ delay (space) ────┘
+//
+// Scroll velocity (signed) drives:
+//   • pitch  — oscillator detune / playbackRate bends with direction
+//   • drive  — waveshaper wet mix rises with speed
+//   • filter — lowpass opens with speed
+//
+// SETTINGS.audioSrc = null  → procedural ambient pad (no asset needed)
+// SETTINGS.audioSrc = 'path/to/track.mp3' → your track, looped
+// ═══════════════════════════════════════════════════════════════════
+
+export function createAudioEngine(SETTINGS) {
+  let ctx = null;
+  let master, filter, dryGain, wetGain, analyser;
+  let oscillators = [];   // procedural mode
+  let baseDetunes = [];
+  let mediaEl = null;     // file mode
+  let whooshGain = null;  // scroll sound-effect layer
+  let whooshFilter = null;
+  let running = false;
+
+  function distortionCurve(amount) {
+    const n = 1024, curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i * 2) / n - 1;
+      curve[i] = Math.tanh(x * amount);
+    }
+    return curve;
+  }
+
+  function build() {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+    master = ctx.createGain();
+    master.gain.value = 0;
+
+    filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 1100;
+    filter.Q.value = 0.7;
+
+    const shaper = ctx.createWaveShaper();
+    shaper.curve = distortionCurve(3.5);
+    shaper.oversample = '2x';
+
+    dryGain = ctx.createGain(); dryGain.gain.value = 1;
+    wetGain = ctx.createGain(); wetGain.gain.value = 0;
+
+    // feedback delay for space
+    const delay = ctx.createDelay(1);
+    delay.delayTime.value = 0.42;
+    const fb = ctx.createGain(); fb.gain.value = 0.32;
+    const fbFilter = ctx.createBiquadFilter();
+    fbFilter.type = 'lowpass'; fbFilter.frequency.value = 1600;
+    delay.connect(fb); fb.connect(fbFilter); fbFilter.connect(delay);
+
+    filter.connect(dryGain);
+    filter.connect(shaper); shaper.connect(wetGain);
+    dryGain.connect(master);
+    wetGain.connect(master);
+    dryGain.connect(delay); delay.connect(master);
+
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    master.connect(analyser);
+    analyser.connect(ctx.destination);
+
+    // ── scroll sound effect: a wind/whoosh that swells with scroll
+    // speed. Silent at rest. Works for both music and pad sets, so the
+    // scroll always has an audible response without warping the track.
+    const wlen = ctx.sampleRate * 2;
+    const wbuf = ctx.createBuffer(1, wlen, ctx.sampleRate);
+    const wd = wbuf.getChannelData(0);
+    for (let i = 0; i < wlen; i++) wd[i] = Math.random() * 2 - 1;
+    const wnoise = ctx.createBufferSource();
+    wnoise.buffer = wbuf; wnoise.loop = true;
+    whooshFilter = ctx.createBiquadFilter();
+    whooshFilter.type = 'bandpass';
+    whooshFilter.frequency.value = 500;
+    whooshFilter.Q.value = 1.2;
+    whooshGain = ctx.createGain();
+    whooshGain.gain.value = 0;
+    wnoise.connect(whooshFilter); whooshFilter.connect(whooshGain);
+    whooshGain.connect(master);
+    wnoise.start();
+
+    if (SETTINGS.audioSrc) {
+      mediaEl = new Audio(SETTINGS.audioSrc);
+      mediaEl.loop = true;
+      mediaEl.crossOrigin = 'anonymous';
+      // keep the track at its true pitch — bending a melodic/rhythmic
+      // track's rate just warbles. The scroll feel comes from the
+      // whoosh layer + a gentle filter sweep instead.
+      mediaEl.preservesPitch = true;
+      mediaEl.webkitPreservesPitch = true;
+      const node = ctx.createMediaElementSource(mediaEl);
+      node.connect(filter);
+      mediaEl.play().catch(() => {});
+    } else {
+      buildPad();
+    }
+  }
+
+  /* ── musical personality ──────────────────────────────────────────
+     The pad isn't a static drone: it wanders a slow chord progression
+     (each morph glides over ~15s), a sub breathes underneath, and
+     sparse pentatonic sparkles play over the top — more often while
+     you're scrolling.
+  */
+  const CHORDS = [
+    [110.00, 164.81, 220.00, 246.94, 329.63], // A2 E3 A3 B3 E4  (Am add9)
+    [ 87.31, 174.61, 220.00, 261.63, 349.23], // F2 F3 A3 C4 F4  (Fmaj)
+    [130.81, 164.81, 196.00, 246.94, 392.00], // C3 E3 G3 B3 G4  (Cmaj7)
+    [ 98.00, 146.83, 196.00, 293.66, 392.00], // G2 D3 G3 D4 G4  (Gsus)
+  ];
+  const PENTATONIC = [440, 523.25, 587.33, 659.25, 783.99, 880]; // A C D E G A
+  let chordIdx = 0;
+  let lastNorm = 0;        // most recent scroll intensity (0..1), set by setWarp
+  let lastParamUpdate = 0; // setWarp throttle clock (ctx time, seconds)
+
+  let subOsc = null;
+
+  function nextChord() {
+    if (!ctx) return;
+    chordIdx = (chordIdx + 1) % CHORDS.length;
+    const target = CHORDS[chordIdx];
+    oscillators.forEach((o, i) => {
+      // long time-constant = the chord melts rather than steps
+      o.frequency.setTargetAtTime(target[i % target.length], ctx.currentTime, 5);
+    });
+    // the sub follows the new root, one octave down
+    if (subOsc) subOsc.frequency.setTargetAtTime(target[0] / 2, ctx.currentTime, 5);
+  }
+
+  function pluck() {
+    if (!ctx || !running) return;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    const note = PENTATONIC[Math.floor(Math.random() * PENTATONIC.length)];
+    o.frequency.value = note * (Math.random() < 0.3 ? 2 : 1); // sometimes an octave up
+    const g = ctx.createGain();
+    const t = ctx.currentTime;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.045 + lastNorm * 0.05, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
+    o.connect(g);
+    g.connect(filter);  // sparkles inherit the delay wash + scroll warp
+    o.start(t);
+    o.stop(t + 2);
+  }
+
+  function scheduleSparkle() {
+    // scrolling raises the sparkle rate — the track plays along with you
+    const gap = (2400 + Math.random() * 4800) / (1 + lastNorm * 2.5);
+    setTimeout(() => { pluck(); scheduleSparkle(); }, gap);
+  }
+
+  // procedural ambient pad: wandering chord + sub pulse + air noise
+  function buildPad() {
+    const chord = CHORDS[0];
+    chord.forEach((f, i) => {
+      const o = ctx.createOscillator();
+      o.type = i < 2 ? 'triangle' : 'sine';
+      o.frequency.value = f;
+      const det = i % 2 ? 4 : -3;   // static chorus detune
+      o.detune.value = det;
+      baseDetunes.push(det);
+
+      const g = ctx.createGain();
+      g.gain.value = i < 2 ? 0.16 : 0.09;
+
+      // slow tremolo so the pad breathes
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 0.05 + i * 0.023;
+      const lfoG = ctx.createGain();
+      lfoG.gain.value = g.gain.value * 0.5;
+      lfo.connect(lfoG); lfoG.connect(g.gain);
+
+      o.connect(g); g.connect(filter);
+      o.start(); lfo.start();
+      oscillators.push(o);
+    });
+
+    // sub: a deep slow-breathing heartbeat under everything
+    // (kept out of `oscillators` so chord morphs don't lift it — it
+    // follows the chord root an octave down via nextChord)
+    subOsc = ctx.createOscillator();
+    subOsc.type = 'sine';
+    subOsc.frequency.value = CHORDS[0][0] / 2; // A1
+    const subG = ctx.createGain();
+    subG.gain.value = 0.05;
+    const subLfo = ctx.createOscillator();
+    subLfo.frequency.value = 0.07;
+    const subLfoG = ctx.createGain();
+    subLfoG.gain.value = 0.03;
+    subLfo.connect(subLfoG); subLfoG.connect(subG.gain);
+    subOsc.connect(subG); subG.connect(filter);
+    subOsc.start(); subLfo.start();
+
+    // air: looped band-passed noise
+    const len = ctx.sampleRate * 2;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * 0.3;
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf; noise.loop = true;
+    const nf = ctx.createBiquadFilter();
+    nf.type = 'bandpass'; nf.frequency.value = 900; nf.Q.value = 0.6;
+    const ng = ctx.createGain(); ng.gain.value = 0.025;
+    noise.connect(nf); nf.connect(ng); ng.connect(filter);
+    noise.start();
+
+    // start the life: chord wander + sparkles
+    setInterval(nextChord, 19000);
+    scheduleSparkle();
+  }
+
+  return {
+    // must be called from a user gesture (browser autoplay policy)
+    toggle() {
+      if (!ctx) build();
+      running = !running;
+      if (running) {
+        ctx.resume();
+        if (mediaEl) mediaEl.play().catch(() => {});
+        master.gain.setTargetAtTime(SETTINGS.audioVolume * 0.3, ctx.currentTime, 0.5);
+      } else {
+        master.gain.setTargetAtTime(0, ctx.currentTime, 0.3);
+      }
+      return running;
+    },
+
+    setVolume(v) {
+      if (ctx && running) {
+        master.gain.setTargetAtTime(v * 0.3, ctx.currentTime, 0.1);
+      }
+    },
+
+    // velSigned: smoothed scroll velocity (± px/frame, clamped).
+    // Called every visual frame, but audio params only need ~14Hz —
+    // we throttle and let setTargetAtTime glide between updates.
+    setWarp(velSigned, maxVel) {
+      if (!ctx || !running) return;
+      const now = ctx.currentTime;
+      if (now - lastParamUpdate < 0.07) return;
+      lastParamUpdate = now;
+
+      const warp = SETTINGS.audioWarp;
+      const norm = Math.min(Math.abs(velSigned) / maxVel, 1);
+      lastNorm = norm;   // sparkle scheduler reads this
+
+      // synth pad bends pitch with scroll direction (sounds good on a
+      // synth); the media track is deliberately left un-bent.
+      const cents = (velSigned / maxVel) * 80 * warp;
+      oscillators.forEach((o, i) => {
+        o.detune.setTargetAtTime(baseDetunes[i] + cents, now, 0.08);
+      });
+      if (subOsc) subOsc.detune.setTargetAtTime(cents, now, 0.08);
+
+      // the scroll sound effect: whoosh swells + brightens with speed
+      if (whooshGain) {
+        whooshGain.gain.setTargetAtTime(norm * 0.18 * warp, now, 0.05);
+        whooshFilter.frequency.setTargetAtTime(400 + norm * 2600 * warp, now, 0.05);
+      }
+
+      // synth pad gets expressive grit on scroll; a real music track
+      // stays clean (heavy drive on music sounds harsh)
+      const driveMul = mediaEl ? 0.4 : 1.0;
+      const wet = Math.min(1, norm * driveMul * warp);
+      wetGain.gain.setTargetAtTime(wet, now, 0.08);
+      dryGain.gain.setTargetAtTime(1 - wet * 0.6, now, 0.08);
+      filter.frequency.setTargetAtTime(1100 + norm * 2600 * warp, now, 0.08);
+    },
+
+    get running() { return running; },
+
+    // average output level 0..1 (handy for debugging / future reactivity)
+    level() {
+      if (!analyser) return 0;
+      const a = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(a);
+      return a.reduce((s, v) => s + v, 0) / a.length / 255;
+    },
+
+    debug() {
+      return ctx ? {
+        state: ctx.state,
+        filterHz: filter.frequency.value,
+        wet: wetGain.gain.value,
+        detune: oscillators[0] ? oscillators[0].detune.value : null,
+      } : null;
+    },
+  };
+}
