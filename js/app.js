@@ -27,7 +27,8 @@ document.getElementById('pill').innerHTML =
   `<b>${SITE.studio}</b><br>${SITE.tagline}`;
 const lensBtn  = document.getElementById('lens-btn');
 const spacer   = document.getElementById('spacer');
-const navEl    = document.getElementById('projnav');
+const railEl   = document.getElementById('rail');
+const catTabsEl = document.getElementById('cat-tabs');
 const detailEl = document.getElementById('detail');
 const detailX  = document.getElementById('detail-x');
 const metaEl   = document.getElementById('detail-meta');
@@ -482,14 +483,45 @@ soundBtn.addEventListener('click', () => {
   soundBtn.classList.toggle('on', on);
 });
 
-/* ── project nav + detail mode ─────────────────────────────────────── */
-const navBtns = PROJECTS.map((p, i) => {
-  const b = document.createElement('button');
-  b.textContent = p.client;
-  b.addEventListener('click', () => openProject(i));
-  navEl.appendChild(b);
-  return b;
-});
+/* ── category tabs + live rail nav ─────────────────────────────────── */
+// categories drive the tabs (e.g. Commercial / Personal); the rail lists
+// the active category's projects and highlights where you are.
+const CATS = [...new Set(PROJECTS.map(p => p.category || 'Work'))];
+let activeCat = CATS[0];
+const railBtns = [];
+
+function renderRail() {
+  railEl.innerHTML = '';
+  railBtns.length = 0;
+  PROJECTS.forEach((p, i) => {
+    if ((p.category || 'Work') !== activeCat) return;
+    const b = document.createElement('button');
+    b.textContent = p.client;
+    b.dataset.idx = i;
+    b.addEventListener('click', () => openProject(i));
+    railEl.appendChild(b);
+    railBtns.push(b);
+  });
+}
+
+function renderTabs() {
+  catTabsEl.innerHTML = '';
+  if (CATS.length < 2) return;   // single-category sets get no tabs
+  CATS.forEach(cat => {
+    const b = document.createElement('button');
+    b.textContent = cat;
+    b.classList.toggle('active', cat === activeCat);
+    b.addEventListener('click', () => {
+      if (cat === activeCat) return;
+      activeCat = cat; renderTabs(); renderRail();
+      const first = PROJECTS.findIndex(p => (p.category || 'Work') === cat);
+      if (first >= 0) openProject(first);     // jump to the category's first project
+    });
+    catTabsEl.appendChild(b);
+  });
+}
+renderTabs();
+renderRail();
 
 /* route transitions fade through black (the original site's pattern):
    fade out → swap the world while invisible → fade back in. */
@@ -546,17 +578,16 @@ function mountCase(i) {
   stopAuto(true);
 }
 
-// already inside: glide along the bleeding track — the visible ride
-function glideToProject(i) {
+// jump STRAIGHT to project i in the case track (no glide-through) — used
+// under a fade so you teleport between projects instead of zooming past
+// every one in between.
+function jumpToProject(i) {
   const cyc = caseTrack.trackH;
-  const pos = ((window.scrollY % cyc) + cyc) % cyc;
-  const target = caseTrack.tops[caseTrack.starts[i]] + VH / 2;  // top-align
-  let d = target - pos;
-  d = ((d % cyc) + cyc * 1.5) % cyc - cyc / 2;   // nearest wrapped copy
-  if (Math.abs(d) < 2) return;
-  if (document.hidden) { window.scrollTo(0, window.scrollY + d); return; }
-  const ms = Math.min(600 + (Math.abs(d) / VH) * 140, 1800);
-  animateScrollTo(window.scrollY + d, ms);
+  const startTop = caseTrack.tops[caseTrack.starts[i]];
+  const y = Math.floor(CASE_LOOPS / 2) * cyc + startTop + VH / 2;
+  window.scrollTo(0, y);
+  smooth = y; lastSmooth = y; scrollDif = 0; prevY = y; userVel = 0;
+  detailIdx = i; populateCard(i);
 }
 
 function openProject(i) {
@@ -564,7 +595,7 @@ function openProject(i) {
   if (detailOpen && i === detailIdx) return;
   stopAuto(false);
   if (detailOpen) {
-    glideToProject(i);
+    fadeSwap(() => { jumpToProject(i); stopAuto(true); }, 200, 600);  // fade-jump
   } else {
     fadeSwap(() => mountCase(i));
   }
@@ -604,7 +635,14 @@ function updateNav() {
   const idx = detailOpen ? detailIdx : currentIndex();
   if (idx === lastNavIdx) return;
   lastNavIdx = idx;
-  navBtns.forEach((b, i) => b.classList.toggle('active', i === idx));
+  // inside a project, flip the active category to match where you've
+  // scrolled (Commercial→Personal boundary swaps the tab + rail). On the
+  // home loop, leave the category as the user set it.
+  if (detailOpen) {
+    const cat = PROJECTS[idx] ? (PROJECTS[idx].category || 'Work') : activeCat;
+    if (cat !== activeCat) { activeCat = cat; renderTabs(); renderRail(); }
+  }
+  railBtns.forEach(b => b.classList.toggle('active', +b.dataset.idx === idx));
 }
 
 /* ── GUI panel ─────────────────────────────────────────────────────── */
