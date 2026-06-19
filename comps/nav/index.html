@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FOVEA — nav comps</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{ --mono:"SF Mono",ui-monospace,Menlo,monospace; --ease:cubic-bezier(.3,0,.15,1); }
+  html,body{height:100%;background:#000;color:#fff;font-family:var(--mono);
+    letter-spacing:.06em;overflow:hidden;}
+  #stage{position:fixed;inset:0;overflow:hidden;}
+
+  /* faux site backdrop — a real IAAH frame, darkened, so the comps sit in context */
+  .backdrop{position:absolute;inset:0;transition:transform .6s var(--ease),filter .6s var(--ease);}
+  .backdrop img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .backdrop::after{content:"";position:absolute;inset:0;background:rgba(0,0,0,.46);}
+  #stage.drawer-open .backdrop{transform:scale(.93) translateX(8%);filter:brightness(.5);}
+
+  /* the IAAH square (pause toggle on the real site — static here) */
+  .square{position:absolute;left:18px;top:18px;width:68px;height:68px;background:#fff;color:#111;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;
+    letter-spacing:.08em;z-index:6;user-select:none;}
+
+  /* top controls */
+  .controls{position:absolute;top:20px;left:50%;transform:translateX(-50%);z-index:8;
+    display:flex;gap:6px;padding:5px;background:rgba(0,0,0,.4);backdrop-filter:blur(10px);
+    border-radius:999px;}
+  .controls button{font:inherit;letter-spacing:.1em;text-transform:uppercase;font-size:11px;
+    color:rgba(255,255,255,.6);background:transparent;border:0;padding:7px 15px;border-radius:999px;cursor:pointer;
+    transition:color .15s,background .15s;}
+  .controls button:hover{color:#fff;}
+  .controls button.on{background:#fff;color:#000;}
+  .menu-btn{position:absolute;right:18px;top:20px;z-index:8;font:inherit;font-size:11px;
+    letter-spacing:.12em;text-transform:uppercase;color:#fff;background:rgba(0,0,0,.4);
+    backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.25);padding:9px 16px;border-radius:999px;cursor:pointer;}
+  .menu-btn:hover{background:rgba(255,255,255,.12);}
+  .tag{position:absolute;left:18px;bottom:16px;z-index:8;font-size:10px;letter-spacing:.18em;
+    text-transform:uppercase;color:rgba(255,255,255,.55);}
+  .closex{position:absolute;right:20px;top:20px;width:34px;height:34px;border-radius:50%;
+    background:rgba(255,255,255,.12);border:0;color:#fff;font:inherit;font-size:15px;cursor:pointer;z-index:40;display:none;}
+  .closex:hover{background:rgba(255,255,255,.24);}
+  #stage.nav-open .closex{display:block;}
+  #stage.nav-open .menu-btn{display:none;}
+
+  /* ── 1 · PORTAL OVERLAY ───────────────────────────────────────── */
+  .portal{position:absolute;inset:0;z-index:20;background:#000;display:none;
+    opacity:0;transition:opacity .5s var(--ease);}
+  .portal.show{display:block;opacity:1;}
+  .portal-prev{position:absolute;inset:0;opacity:0;transition:opacity .45s var(--ease);}
+  .portal-prev img{width:100%;height:100%;object-fit:cover;filter:brightness(.4) saturate(1.1);
+    transform:scale(1.08);}
+  .portal-list{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;
+    padding:0 7vw;gap:.1em;}
+  .portal-row{display:flex;align-items:baseline;gap:1.1ch;cursor:pointer;
+    font-weight:700;font-size:clamp(26px,5vw,72px);line-height:1.04;letter-spacing:-.01em;
+    color:rgba(255,255,255,.34);transition:color .25s var(--ease),transform .35s var(--ease),opacity .25s;}
+  .portal-row .num{font-size:.26em;font-weight:400;letter-spacing:.1em;color:rgba(255,255,255,.4);
+    transform:translateY(-.6em);}
+  .portal.hovering .portal-row{opacity:.32;}
+  .portal-row:hover{color:#fff;opacity:1;transform:translateX(2.2ch) skewX(-7deg) scaleY(1.04);}
+  .portal-foot{position:absolute;left:0;right:0;bottom:5vh;display:flex;justify-content:center;gap:8px;}
+  .portal-foot button{font:inherit;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    color:rgba(255,255,255,.6);background:transparent;border:0;padding:7px 15px;border-radius:999px;cursor:pointer;}
+  .portal-foot button.on{background:#fff;color:#000;}
+
+  /* ── 2 · SIDE DRAWER ──────────────────────────────────────────── */
+  .drawer{position:absolute;top:0;left:0;height:100%;width:min(380px,86vw);z-index:24;
+    background:rgba(8,8,8,.86);backdrop-filter:blur(18px);border-right:1px solid rgba(255,255,255,.1);
+    transform:translateX(-102%);transition:transform .5s var(--ease);
+    display:flex;flex-direction:column;padding:26px 22px;}
+  #stage.drawer-open .drawer{transform:translateX(0);}
+  .drawer h2{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:16px;}
+  .drawer-filters{display:flex;gap:6px;margin-bottom:12px;}
+  .drawer-filters button{font:inherit;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+    color:rgba(255,255,255,.55);background:transparent;border:1px solid rgba(255,255,255,.18);
+    padding:6px 11px;border-radius:999px;cursor:pointer;}
+  .drawer-filters button.on{background:#fff;color:#000;border-color:#fff;}
+  .drawer input{width:100%;font:inherit;font-size:12px;letter-spacing:.06em;color:#fff;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:8px;
+    padding:9px 12px;margin-bottom:14px;outline:none;}
+  .drawer input::placeholder{color:rgba(255,255,255,.35);}
+  .drawer-list{flex:1;overflow-y:auto;scrollbar-width:none;}
+  .drawer-list::-webkit-scrollbar{display:none;}
+  .drawer-row{display:flex;align-items:center;gap:11px;padding:7px 4px;cursor:pointer;border-radius:7px;
+    transition:background .15s;}
+  .drawer-row:hover{background:rgba(255,255,255,.08);}
+  .drawer-row img{width:34px;height:34px;object-fit:cover;flex:none;background:#222;}
+  .drawer-row .dr-name{flex:1;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:rgba(255,255,255,.85);}
+  .drawer-row .dr-year{font-size:10px;color:rgba(255,255,255,.4);}
+
+  /* ── 3 · ORBITAL / LENS-INDEX ─────────────────────────────────── */
+  .orbital{position:absolute;inset:0;z-index:22;background:rgba(0,0,0,.92);display:none;}
+  .orbital.show{display:block;}
+  .ring{position:absolute;left:50%;top:50%;width:0;height:0;}
+  .ring-item{position:absolute;left:0;top:0;transform-origin:0 0;white-space:nowrap;
+    font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4);
+    cursor:pointer;transition:color .2s,font-size .2s;}
+  .ring-item.focus{color:#fff;font-size:14px;}
+  .lens{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(40vmin,300px);
+    height:min(40vmin,300px);border-radius:50%;overflow:hidden;border:1px solid rgba(255,255,255,.25);
+    display:flex;align-items:center;justify-content:center;}
+  .lens img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.55);}
+  .lens .lens-name{position:relative;z-index:2;font-weight:700;font-size:clamp(16px,3.4vw,30px);
+    text-align:center;padding:0 1em;line-height:1.1;text-shadow:0 2px 14px #000;}
+  .orbital-hint{position:absolute;left:50%;bottom:6vh;transform:translateX(-50%);font-size:10px;
+    letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.45);}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="backdrop"><img id="bd-img" src="../../content/iaah/griselda/00.jpg" alt=""></div>
+  <div class="square">IAAH</div>
+
+  <div class="controls">
+    <button data-comp="portal" class="on">Portal</button>
+    <button data-comp="drawer">Drawer</button>
+    <button data-comp="orbital">Orbital</button>
+  </div>
+  <button class="menu-btn" id="menuBtn">Menu</button>
+  <button class="closex" id="closeX" aria-label="Close">&#10005;</button>
+  <div class="tag" id="tag">Comp · Portal overlay</div>
+
+  <!-- 1 · portal -->
+  <div class="portal" id="portal">
+    <div class="portal-prev" id="portalPrev"><img id="portalPrevImg" src="" alt=""></div>
+    <div class="portal-list" id="portalList"></div>
+    <div class="portal-foot">
+      <button data-cat="Commercial" class="on">Commercial</button>
+      <button data-cat="Personal">Personal</button>
+    </div>
+  </div>
+
+  <!-- 2 · drawer -->
+  <aside class="drawer" id="drawer">
+    <h2>Index</h2>
+    <div class="drawer-filters">
+      <button data-f="All" class="on">All</button>
+      <button data-f="Commercial">Commercial</button>
+      <button data-f="Personal">Personal</button>
+    </div>
+    <input id="drawerSearch" placeholder="Search projects…" autocomplete="off">
+    <div class="drawer-list" id="drawerList"></div>
+  </aside>
+
+  <!-- 3 · orbital -->
+  <div class="orbital" id="orbital">
+    <div class="ring" id="ring"></div>
+    <div class="lens"><img id="lensImg" src="" alt=""><div class="lens-name" id="lensName"></div></div>
+    <div class="orbital-hint">Scroll to spin · click a name to focus</div>
+  </div>
+</div>
+
+<script>
+const P = [
+  ['GRISELDA','Commercial','griselda',2024],['FINESTKIND','Commercial','finestkind',2023],
+  ['SQSP REBRAND','Commercial','sqsp-rebrand',2023],['THE TRIAL','Commercial','the-trial',2023],
+  ['WETRANSFER X OUTERNET','Commercial','wetransfer-x-outernet',2022],['BURIAL','Commercial','burial',2021],
+  ['KATLA','Commercial','katla',2021],['HOW TO SELL DRUGS ONLINE FAST','Commercial','how-to-sell-drugs-online-fast',2020],
+  ['QUEENS GAMBIT','Commercial','queens-gambit',2020],['GRAND ARMY','Commercial','grand-army',2020],
+  ['DEAD MEN','Commercial','dead-men',2019],['SPEAK YOUR MIND','Commercial','speak-your-mind',2018],
+  ['SQSP. MAKE IT.','Commercial','squarespace-make-itt',2018],['SQUARESPACE — BUILD IT BEAUTIFUL','Commercial','squarespace-build-it-beautiful',2017],
+  ['SPIDERMAN','Commercial','spiderman',2012],['YOUNG GUNS 9','Commercial','young-guns-9',2011],
+  ['ALPHABET SOUP','Personal','alphabet-soup',2023],['BODY TYPE','Personal','body-type',2022],
+  ['IAAH REEL 2024','Personal','iaah-reel-2024',2024],['MOVEMENT','Personal','movement',2021],
+  ['NEUE FASHION','Personal','neue-fashion',2020],['THE CRITERION COLLECTION','Personal','the-criterion-collection',2019],
+  ['THE LAST OF US','Personal','the-last-of-us',2020],['TYPE AS FORM','Personal','type-as-form',2019],
+  ['IAAH HEADERS','Personal','iaah-headers',2018],
+].map(([client,cat,slug,year])=>({client,cat,slug,year,img:`../../content/iaah/${slug}/00.jpg`}));
+
+const stage=document.getElementById('stage');
+const $=s=>document.querySelector(s);
+let activeComp='portal';
+
+/* comp switcher */
+document.querySelectorAll('.controls button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.controls button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); activeComp=b.dataset.comp;
+  $('#tag').textContent='Comp · '+({portal:'Portal overlay',drawer:'Side drawer',orbital:'Orbital / lens-index'})[activeComp];
+  closeAll(); openComp();
+});
+$('#menuBtn').onclick=openComp;
+$('#closeX').onclick=closeAll;
+document.addEventListener('keydown',e=>{ if(e.key==='m'||e.key==='M')openComp(); if(e.key==='Escape')closeAll(); });
+
+function closeAll(){
+  stage.classList.remove('nav-open','drawer-open');
+  $('#portal').classList.remove('show'); $('#orbital').classList.remove('show');
+}
+function openComp(){
+  stage.classList.add('nav-open');
+  if(activeComp==='portal'){ buildPortal('Commercial'); $('#portal').classList.add('show'); }
+  if(activeComp==='drawer'){ buildDrawer(); stage.classList.add('drawer-open'); }
+  if(activeComp==='orbital'){ buildOrbital('Commercial'); $('#orbital').classList.add('show'); }
+}
+
+/* 1 · portal */
+function buildPortal(cat){
+  const list=$('#portalList'), portal=$('#portal'); list.innerHTML='';
+  P.filter(p=>p.cat===cat).forEach((p,i)=>{
+    const row=document.createElement('div'); row.className='portal-row';
+    row.innerHTML=`<span class="num">${String(i+1).padStart(2,'0')}</span>${p.client}`;
+    row.onmouseenter=()=>{ portal.classList.add('hovering');
+      $('#portalPrevImg').src=p.img; $('#portalPrev').style.opacity=.6; };
+    list.appendChild(row);
+  });
+  list.onmouseleave=()=>{ portal.classList.remove('hovering'); $('#portalPrev').style.opacity=0; };
+  document.querySelectorAll('.portal-foot button').forEach(b=>{
+    b.classList.toggle('on',b.dataset.cat===cat);
+    b.onclick=()=>buildPortal(b.dataset.cat);
+  });
+}
+
+/* 2 · drawer */
+let drawerFilter='All';
+function buildDrawer(){
+  const wrap=$('#drawerList'), q=$('#drawerSearch').value.trim().toLowerCase(); wrap.innerHTML='';
+  P.filter(p=>(drawerFilter==='All'||p.cat===drawerFilter)&&p.client.toLowerCase().includes(q)).forEach(p=>{
+    const row=document.createElement('div'); row.className='drawer-row';
+    row.innerHTML=`<img src="${p.img}" alt=""><span class="dr-name">${p.client}</span><span class="dr-year">${p.year}</span>`;
+    wrap.appendChild(row);
+  });
+}
+document.querySelectorAll('.drawer-filters button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.drawer-filters button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); drawerFilter=b.dataset.f; buildDrawer();
+});
+$('#drawerSearch').oninput=buildDrawer;
+
+/* 3 · orbital */
+let ringItems=[], ringRot=0, ringList=[];
+function buildOrbital(cat){
+  const ring=$('#ring'); ring.innerHTML=''; ringItems=[]; ringRot=0;
+  ringList=P.filter(p=>p.cat===cat);
+  const R=Math.min(window.innerHeight,window.innerWidth)*0.40;
+  ringList.forEach((p,i)=>{
+    const el=document.createElement('div'); el.className='ring-item'; el.textContent=p.client;
+    el.dataset.i=i; el.onclick=()=>{ ringRot = -i*(360/ringList.length); layoutRing(); };
+    ring.appendChild(el); ringItems.push({el,p,R});
+  });
+  layoutRing();
+}
+function layoutRing(){
+  const n=ringItems.length, step=360/n;
+  let focusIdx=0, best=1e9;
+  ringItems.forEach((it,i)=>{
+    const ang=(i*step+ringRot-90)*Math.PI/180;
+    const x=Math.cos(ang)*it.R, y=Math.sin(ang)*it.R;
+    it.el.style.transform=`translate(${x}px,${y}px) translate(-50%,-50%)`;
+    const top=Math.abs(((i*step+ringRot)%360+360)%360 - 0); // distance from 0deg (top)
+    const d=Math.min(top,360-top);
+    if(d<best){best=d;focusIdx=i;}
+    it.el.classList.remove('focus');
+  });
+  const f=ringItems[focusIdx]; f.el.classList.add('focus');
+  $('#lensImg').src=f.p.img; $('#lensName').textContent=f.p.client;
+}
+$('#orbital').addEventListener('wheel',e=>{ e.preventDefault(); ringRot+=e.deltaY*0.12; layoutRing(); },{passive:false});
+
+/* open the default comp on load so the page lands on something live */
+openComp();
+</script>
+</body>
+</html>
