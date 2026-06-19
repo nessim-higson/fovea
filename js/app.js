@@ -23,8 +23,6 @@ const { SITE, PROJECTS, SETTINGS } = await import(
 );
 
 /* ── DOM ───────────────────────────────────────────────────────────── */
-document.getElementById('pill').innerHTML =
-  `<b>${SITE.studio}</b><br>${SITE.tagline}`;
 const lensBtn  = document.getElementById('lens-btn');
 const spacer   = document.getElementById('spacer');
 const railEl   = document.getElementById('rail');

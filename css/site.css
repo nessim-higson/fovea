@@ -34,14 +34,14 @@ body::-webkit-scrollbar { display: none; }
    Lifted from the UNIQLOCK landmark mark. Sharp corners on purpose: a rotating
    square reads as a metronome / time passing. */
 .metro {
-  position: absolute; left: 14px; top: 13px;
-  width: 46px; height: 46px;
+  position: absolute; left: 16px; top: 16px;
+  width: 68px; height: 68px;
   z-index: 11;
   background: #fff; color: #111;
   display: flex; align-items: center; justify-content: center;
   border: 0; padding: 0; cursor: pointer;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-weight: 700; font-size: 9px; letter-spacing: 0.06em;
+  font-weight: 700; font-size: 12px; letter-spacing: 0.08em;
   text-transform: uppercase;
   will-change: transform;
   user-select: none; -webkit-user-select: none;
@@ -49,21 +49,6 @@ body::-webkit-scrollbar { display: none; }
 .metro span { pointer-events: none; }
 /* paused = motion stopped: invert + a ring so the stop reads clearly */
 .metro.paused { background: #111; color: #fff; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.85); }
-
-/* studio pill — top-left, just right of the square */
-.pill {
-  position: absolute; left: 70px; top: 13px;
-  padding: 7px 13px;
-  text-align: left;
-  text-transform: uppercase;
-  line-height: 1.55;
-  background: rgba(0,0,0,0.22);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 11px;
-  user-select: none;
-}
-.pill b { font-weight: 700; }
 
 /* category tabs — bottom-centre */
 .cat-tabs {
