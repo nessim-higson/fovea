@@ -53,6 +53,18 @@ const SAFE = /* glsl */`
 const SAFE_PARAM =
   { key: 'safeArea', label: 'Safe area', value: 0.35, min: 0, max: 0.9, step: 0.01 };
 
+// value-noise + fbm, for the organic passes (glass, caustics)
+const NOISE = /* glsl */`
+  float hash21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+  float vnoise(vec2 p){
+    vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+    float a = hash21(i), b = hash21(i + vec2(1.0, 0.0));
+    float c = hash21(i + vec2(0.0, 1.0)), d = hash21(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+  }
+  float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++){ v += a * vnoise(p); p *= 2.0; a *= 0.5; } return v; }
+`;
+
 // shared tail: saturation dim + transition fade, applied to `outColor`
 const FINISH = /* glsl */`
     float avg = (outColor.r + outColor.g + outColor.b) / 3.0;
@@ -359,6 +371,137 @@ export const EFFECTS = {
 
         vec2 nVuv = vUv + dirn * wave * amp;
         vec4 outColor = texture2D(tex1, nVuv);
+        ${FINISH}
+      }
+    `,
+  },
+
+  /* ── LENS-FAMILY EXPERIMENTS (similar feeling, different mechanism) ── */
+
+  /* 9. Radial focus / depth-of-field — center sharp, edges bokeh-blur.
+        the fovea made literal, no geometry warp. */
+  'radial-focus': {
+    name: 'Radial Focus (DoF)',
+    params: [
+      { key: 'focusSize', label: 'Focus size',  value: 0.30, min: 0,  max: 0.9, step: 0.01 },
+      { key: 'blurMax',   label: 'Edge blur',   value: 1.0,  min: 0,  max: 3,   step: 0.05 },
+      { key: 'velBlur',   label: 'Scroll blur', value: 1.0,  min: 0,  max: 3,   step: 0.05 },
+    ],
+    frag: HEADER + /* glsl */`
+      uniform float focusSize;
+      uniform float blurMax;
+      uniform float velBlur;
+
+      void main() {
+        float d = length(vUv - 0.5) * 2.0;             // 0 center → 1 corner
+        float t = smoothstep(focusSize, 1.0, d);       // sharp center, blur edges
+        float vel = clamp(abs(scrollDif), 0.0, 40.0);
+        float radius = (blurMax * 0.012 + vel * 0.0008 * velBlur) * t * displacement;
+
+        vec3 sum = texture2D(tex1, vUv).rgb;
+        float w = 1.0;
+        for (int i = 0; i < 12; i++) {                 // golden-angle bokeh disk
+          float fi = float(i);
+          float a = fi * 2.39996;
+          float r = radius * sqrt(fi / 12.0);
+          sum += texture2D(tex1, vUv + vec2(cos(a), sin(a)) * r).rgb;
+          w += 1.0;
+        }
+        vec4 outColor = vec4(sum / w, 1.0);
+        ${FINISH}
+      }
+    `,
+  },
+
+  /* 10. Glass / water refraction — organic noise normal-map bends the
+         image; surface flows with scroll. */
+  'glass': {
+    name: 'Glass / Water',
+    params: [
+      { key: 'glassScale', label: 'Ripple scale', value: 3.0, min: 0.5, max: 12, step: 0.1  },
+      { key: 'glassAmt',   label: 'Refraction',   value: 1.0, min: 0,   max: 3,  step: 0.05 },
+      { key: 'flowSpeed',  label: 'Flow speed',   value: 1.0, min: 0,   max: 4,  step: 0.05 },
+      SAFE_PARAM,
+    ],
+    frag: HEADER + SAFE + NOISE + /* glsl */`
+      uniform float glassScale;
+      uniform float glassAmt;
+      uniform float flowSpeed;
+
+      void main() {
+        float m = edgeMask(vUv) * displacement;
+        float t = time * 0.0002 * flowSpeed + abs(scrollDif) * 0.01;
+        vec2 p = vUv * glassScale;
+        float e = 0.06;
+        float n  = fbm(p + t);
+        float nx = fbm(p + vec2(e, 0.0) + t) - n;      // surface gradient = normal
+        float ny = fbm(p + vec2(0.0, e) + t) - n;
+        vec2 refr = vec2(nx, ny) * (glassAmt * 1.6) * m;
+        vec4 outColor = texture2D(tex1, vUv + refr);
+        ${FINISH}
+      }
+    `,
+  },
+
+  /* 11. Chromatic dispersion — RGB splits radially toward the rim,
+         the lens's colour physics as a prism. */
+  'dispersion': {
+    name: 'Chromatic Dispersion',
+    params: [
+      { key: 'dispAmt', label: 'Dispersion',   value: 1.0, min: 0, max: 3, step: 0.05 },
+      { key: 'velDisp', label: 'Scroll split', value: 1.0, min: 0, max: 3, step: 0.05 },
+      SAFE_PARAM,
+    ],
+    frag: HEADER + SAFE + /* glsl */`
+      uniform float dispAmt;
+      uniform float velDisp;
+
+      void main() {
+        float m = edgeMask(vUv) * displacement;
+        float vel = clamp(abs(scrollDif), 0.0, 40.0);
+        vec2 dir = vUv - 0.5;
+        float amt = (dispAmt * 0.02 + vel * 0.0015 * velDisp) * m;
+        vec4 outColor = vec4(
+          texture2D(tex1, vUv + dir * amt).r,
+          texture2D(tex1, vUv).g,
+          texture2D(tex1, vUv - dir * amt).b,
+          1.0
+        );
+        // a touch of wider rainbow on the fringes
+        outColor.r = mix(outColor.r, texture2D(tex1, vUv + dir * amt * 1.4).r, 0.3);
+        outColor.b = mix(outColor.b, texture2D(tex1, vUv - dir * amt * 1.4).b, 0.3);
+        ${FINISH}
+      }
+    `,
+  },
+
+  /* 12. Caustics — a luminous pool-floor light web overlaid + a gentle
+         refraction; light-based depth, not geometric. */
+  'caustics': {
+    name: 'Caustics',
+    params: [
+      { key: 'caScale',  label: 'Scale',      value: 4.0, min: 1, max: 14, step: 0.1  },
+      { key: 'caBright', label: 'Brightness', value: 1.0, min: 0, max: 3,  step: 0.05 },
+      { key: 'caSpeed',  label: 'Speed',      value: 1.0, min: 0, max: 4,  step: 0.05 },
+      SAFE_PARAM,
+    ],
+    frag: HEADER + SAFE + NOISE + /* glsl */`
+      uniform float caScale;
+      uniform float caBright;
+      uniform float caSpeed;
+
+      void main() {
+        float m = edgeMask(vUv) * displacement;
+        float t = time * 0.0003 * caSpeed + abs(scrollDif) * 0.006;
+        vec2 p = vUv * caScale;
+        // domain-warped noise → sharp caustic ridges
+        vec2 q = p + vec2(fbm(p + t), fbm(p + vec2(5.2, 1.3) - t));
+        float n = fbm(q * 1.5 + t);
+        float ca = pow(1.0 - abs(n * 2.0 - 1.0), 4.0);
+
+        vec2 refr = (vec2(n) - 0.5) * 0.012 * m;
+        vec4 outColor = texture2D(tex1, vUv + refr);
+        outColor.rgb += ca * caBright * 0.6 * m;       // luminous overlay
         ${FINISH}
       }
     `,
