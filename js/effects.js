@@ -554,4 +554,44 @@ export const EFFECTS = {
       }
     `,
   },
+
+  /* 14. Feedback / trails — the previous frame is zoomed, rotated and
+        decayed, then blended under the current one (ping-pong buffer).
+        Builds receding tunnels and motion-trails; depth from motion
+        memory, so it works on any source. Scroll deepens it. */
+  'feedback': {
+    name: 'Feedback / Trails',
+    params: [
+      { key: 'fbAmount', label: 'Trail',  value: 0.92, min: 0,    max: 1,    step: 0.01 },
+      { key: 'fbFade',   label: 'Decay',  value: 0.94, min: 0.5,  max: 0.99, step: 0.005 },
+      { key: 'fbZoom',   label: 'Tunnel', value: 1.5,  min: -4,   max: 4,    step: 0.05 },
+      { key: 'fbRotate', label: 'Spiral', value: 0.4,  min: -4,   max: 4,    step: 0.05 },
+    ],
+    frag: HEADER + /* glsl */`
+      uniform sampler2D uFeedback;
+      uniform float fbAmount;
+      uniform float fbFade;
+      uniform float fbZoom;
+      uniform float fbRotate;
+
+      void main() {
+        vec4 cur = texture2D(tex1, vUv);
+        float vel = clamp(abs(scrollDif), 0.0, 40.0);
+
+        // transform the feedback: zoom toward center (tunnel) + rotate (spiral),
+        // both deepened by scroll velocity
+        vec2 c = vUv - 0.5;
+        float ang = (fbRotate + vel * 0.02) * 0.012;
+        float s   = 1.0 - (fbZoom + vel * 0.06) * 0.01;
+        mat2 R = mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
+        vec2 fuv = R * (c * s) + 0.5;
+
+        vec3 trail = texture2D(uFeedback, fuv).rgb * fbFade;
+        vec4 outColor = cur;
+        // keep the brighter of current vs decayed-trail → luminous, stable
+        outColor.rgb = max(cur.rgb, trail * fbAmount * displacement);
+        ${FINISH}
+      }
+    `,
+  },
 };

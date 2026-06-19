@@ -56,6 +56,11 @@ const sceneB = new THREE.Scene();
 
 const rt = new THREE.WebGLRenderTarget(1, 1);  // sized in layout()
 
+// ping-pong buffers for the feedback effect (previous frame → next frame)
+let fbA = new THREE.WebGLRenderTarget(1, 1);
+let fbB = new THREE.WebGLRenderTarget(1, 1);
+let prevFb = fbA, curFb = fbB;
+
 /* ── image track ───────────────────────────────────────────────────
    Each slide is a segmented plane so the TRACK BEND vertex shader can
    bow it with scroll velocity: scroll down → bows down, up → up.
@@ -298,6 +303,7 @@ function baseUniforms() {
     scrollDif:    { value: 0 },
     uBeat:        { value: 0 },
     uMouse:       { value: new THREE.Vector2(0, 0) },
+    uFeedback:    { value: rt.texture },   // previous frame (feedback effect)
   };
 }
 
@@ -355,7 +361,10 @@ function layout() {
   }
   VW = w; VH = h;
   renderer.setSize(VW, VH);
-  rt.setSize(VW * renderer.getPixelRatio(), VH * renderer.getPixelRatio());
+  const pr = renderer.getPixelRatio();
+  rt.setSize(VW * pr, VH * pr);
+  fbA.setSize(VW * pr, VH * pr);
+  fbB.setSize(VW * pr, VH * pr);
   for (const cam of [camA, camB]) {
     cam.left = -VW / 2; cam.right = VW / 2;
     cam.top = VH / 2; cam.bottom = -VH / 2;
@@ -787,9 +796,23 @@ function frame(now) {
   renderer.setRenderTarget(rt);
   renderer.clear();
   renderer.render(sceneA, camA);
-  renderer.setRenderTarget(null);
-  renderer.clear();
-  renderer.render(sceneB, camB);
+
+  if (activeEffect === 'feedback') {
+    // feed the previous frame back in, render this frame to curFb AND the
+    // screen, then swap — building receding tunnels / motion trails.
+    u.uFeedback.value = prevFb.texture;
+    renderer.setRenderTarget(curFb);
+    renderer.clear();
+    renderer.render(sceneB, camB);
+    renderer.setRenderTarget(null);
+    renderer.clear();
+    renderer.render(sceneB, camB);
+    const t = prevFb; prevFb = curFb; curFb = t;
+  } else {
+    renderer.setRenderTarget(null);
+    renderer.clear();
+    renderer.render(sceneB, camB);
+  }
 
   updateNav();
   requestAnimationFrame(frame);
