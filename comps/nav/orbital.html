@@ -99,7 +99,7 @@ function dims(){ const W=innerWidth,H=innerHeight;
   cx=W/2; cy=H*0.52; rx=Math.min(W*0.40,600); ry=Math.min(H*0.42,380); }
 
 function build(cat){
-  ring.innerHTML=''; items=[]; rot=0; target=0; focus=-1;
+  ring.innerHTML=''; items=[]; rot=-90; target=-90; focus=-1; // open on the first project
   list=P.filter(p=>p.cat===cat);
   list.forEach((p,i)=>{
     const el=document.createElement('div'); el.className='ring-item'; el.textContent=p.client;
