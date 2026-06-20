@@ -13,16 +13,9 @@
   html,body{height:100%;background:#000;color:#fff;font-family:var(--mono);overflow:hidden;}
   #stage{position:fixed;inset:0;overflow:hidden;cursor:grab;}
   #stage:active{cursor:grabbing;}
-
-  /* full-bleed background — crossfades + slowly settles to the focused project */
-  .bg{position:absolute;inset:-4%;background-size:cover;background-position:center;
-    opacity:0;transform:scale(1.12);filter:brightness(.42) saturate(1.06);
-    transition:opacity .9s ease, transform 1.6s ease;}
-  .bg.on{opacity:1;transform:scale(1.03);}
-  .scrim{position:absolute;inset:0;pointer-events:none;z-index:2;
-    background:
-      radial-gradient(125% 95% at 50% 44%, rgba(0,0,0,0) 38%, rgba(0,0,0,.58) 100%),
-      linear-gradient(to bottom, rgba(0,0,0,.34), rgba(0,0,0,.12) 34%, rgba(0,0,0,.64));}
+  #gl{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1;}
+  .floor{position:absolute;inset:0;z-index:3;pointer-events:none;
+    background:linear-gradient(to bottom, rgba(0,0,0,.18), rgba(0,0,0,0) 26%, rgba(0,0,0,.55));}
 
   .square{position:absolute;left:18px;top:18px;width:68px;height:68px;background:#fff;color:#111;
     display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;
@@ -30,18 +23,15 @@
 
   .ring{position:absolute;inset:0;z-index:5;}
   .ring-item{position:absolute;left:0;top:0;white-space:nowrap;cursor:pointer;
-    font-family:"Fraunces",Georgia,serif;font-style:normal;color:#fff;
-    text-transform:uppercase;line-height:1;
-    will-change:transform,opacity,font-size,filter;transform:translate(-50%,-50%);}
+    font-family:"Fraunces",Georgia,serif;color:#fff;text-transform:uppercase;line-height:1;
+    will-change:transform,opacity,font-size,filter,text-shadow;transform:translate(-50%,-50%);}
 
-  /* meta caption — italic serif, the one editorial flourish; year · category only */
   .meta{position:absolute;left:50%;bottom:8.5vh;transform:translateX(-50%);z-index:6;
     font-family:"Fraunces",Georgia,serif;font-style:italic;font-weight:400;
     font-size:15px;letter-spacing:.04em;color:rgba(255,255,255,.82);
     transition:opacity .5s ease;text-shadow:0 2px 16px rgba(0,0,0,.6);}
 
-  .toggle{position:absolute;left:50%;bottom:3.4vh;transform:translateX(-50%);z-index:9;
-    display:flex;gap:6px;}
+  .toggle{position:absolute;left:50%;bottom:3.4vh;transform:translateX(-50%);z-index:9;display:flex;gap:6px;}
   .toggle button{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
     color:rgba(255,255,255,.5);background:transparent;border:0;padding:6px 13px;border-radius:999px;cursor:pointer;}
   .toggle button.on{background:rgba(255,255,255,.92);color:#000;}
@@ -54,16 +44,12 @@
 </head>
 <body>
 <div id="stage">
-  <div class="bg" id="bgA"></div>
-  <div class="bg" id="bgB"></div>
-  <div class="scrim"></div>
-
+  <canvas id="gl"></canvas>
+  <div class="floor"></div>
   <div class="square">IAAH</div>
   <div class="hint">Scroll / drag to spin</div>
-
   <div class="ring" id="ring"></div>
   <div class="meta" id="meta"></div>
-
   <div class="toggle">
     <button data-cat="Commercial" class="on">Commercial</button>
     <button data-cat="Personal">Personal</button>
@@ -88,84 +74,133 @@ const P = [
   ['IAAH HEADERS','Personal','iaah-headers',2018],
 ].map(([client,cat,slug,year])=>({client,cat,slug,year,img:`../../content/iaah/${slug}/00.jpg`}));
 
-const ring=document.getElementById('ring'), metaEl=document.getElementById('meta');
-const bgs=[document.getElementById('bgA'),document.getElementById('bgB')];
-let items=[], list=[], rot=0, target=0, focus=-1, bgFlip=0, cx,cy,rx,ry;
+/* ── WebGL lens background — same family as the site's lens-tunnel pass:
+   radial barrel magnification + chromatic aberration, intensified by spin. ── */
+const cv=document.getElementById('gl');
+const gl=cv.getContext('webgl',{antialias:true,premultipliedAlpha:false});
+const VS=`attribute vec2 p;varying vec2 vUv;void main(){vUv=p*0.5+0.5;gl_Position=vec4(p,0.,1.);}`;
+const FS=`precision highp float;varying vec2 vUv;
+uniform sampler2D uA,uB;uniform vec2 uCovA,uCovB;uniform float uFade,uVel;
+vec2 fit(vec2 c,vec2 cov){return c*cov+0.5;}
+vec3 lens(sampler2D t,vec2 cov){
+  vec2 c=vUv-0.5;float r=length(c);
+  float k=0.9+uVel*1.7;                       // barrel strength, grows as you spin
+  vec2 q=c*(1.0-k*0.34*r*r);                  // pull edges in → fisheye centre
+  float ca=(0.5+uVel*1.4)*(0.004+r*0.02);     // chromatic split along the radius
+  float R=texture2D(t,fit(q*(1.0+ca),cov)).r;
+  float G=texture2D(t,fit(q,cov)).g;
+  float B=texture2D(t,fit(q*(1.0-ca),cov)).b;
+  return vec3(R,G,B);
+}
+void main(){
+  vec3 col=mix(lens(uA,uCovA),lens(uB,uCovB),uFade);
+  float r=length(vUv-0.5);
+  col*=0.5;                                   // darken for type legibility
+  col*=1.0-0.55*smoothstep(0.42,1.05,r);      // vignette
+  gl_FragColor=vec4(col,1.0);
+}`;
+function sh(t,s){const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);return o;}
+const prog=gl.createProgram();
+gl.attachShader(prog,sh(gl.VERTEX_SHADER,VS));gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,FS));
+gl.linkProgram(prog);gl.useProgram(prog);
+const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+const aP=gl.getAttribLocation(prog,'p');gl.enableVertexAttribArray(aP);gl.vertexAttribPointer(aP,2,gl.FLOAT,false,0,0);
+const U=n=>gl.getUniformLocation(prog,n);
+const uA=U('uA'),uB=U('uB'),uCovA=U('uCovA'),uCovB=U('uCovB'),uFade=U('uFade'),uVel=U('uVel');
+gl.uniform1i(uA,0);gl.uniform1i(uB,1);
 
-const lerp=(a,b,t)=>a+(b-a)*t;
-const smooth=t=>t*t*(3-2*t);
+const texCache={};
+function getTex(url){
+  if(texCache[url])return texCache[url];
+  const t={tex:gl.createTexture(),asp:1.5,ready:false};
+  gl.bindTexture(gl.TEXTURE_2D,t.tex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([18,18,18,255]));
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  const im=new Image();
+  im.onload=()=>{gl.bindTexture(gl.TEXTURE_2D,t.tex);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,im);
+    t.asp=im.naturalWidth/im.naturalHeight;t.ready=true;};
+  im.src=url;texCache[url]=t;return t;
+}
+let slotA=getTex(P[0].img),slotB=slotA,fade=0,fading=false;
+function focusTo(p){const t=getTex(p.img);if(t===slotB&&!fading)return;
+  if(fading)slotA=slotB;slotB=t;fade=0;fading=true;}
+function cov(asp){const ca=cv.width/cv.height;return asp>ca?[ca/asp,1]:[1,asp/ca];}
 
-function dims(){ const W=innerWidth,H=innerHeight;
-  cx=W/2; cy=H*0.52; rx=Math.min(W*0.40,600); ry=Math.min(H*0.42,380); }
-
+/* ── ring of names ── */
+const ring=document.getElementById('ring'),metaEl=document.getElementById('meta');
+let items=[],list=[],rot=-90,target=-90,focus=-1,prevRot=-90,spin=0,cx,cy,rx,ry;
+const lerp=(a,b,t)=>a+(b-a)*t, smooth=t=>t*t*(3-2*t);
+function dims(){const dpr=Math.min(2,devicePixelRatio||1);
+  cv.width=innerWidth*dpr;cv.height=innerHeight*dpr;gl.viewport(0,0,cv.width,cv.height);
+  cx=innerWidth/2;cy=innerHeight*0.52;rx=Math.min(innerWidth*0.40,600);ry=Math.min(innerHeight*0.42,380);}
 function build(cat){
-  ring.innerHTML=''; items=[]; rot=-90; target=-90; focus=-1; // open on the first project
-  list=P.filter(p=>p.cat===cat);
+  ring.innerHTML='';items=[];rot=-90;target=-90;prevRot=-90;focus=-1;
+  list=P.filter(p=>p.cat===cat);list.forEach(p=>getTex(p.img)); // warm the textures
   list.forEach((p,i)=>{
-    const el=document.createElement('div'); el.className='ring-item'; el.textContent=p.client;
-    el.onclick=()=>{ // bring this name to the top by the shortest path
-      const n=list.length, step=360/n; let t=-90 - i*step;
-      while(t-target>180)t-=360; while(t-target<-180)t+=360; target=t; };
+    const el=document.createElement('div');el.className='ring-item';el.textContent=p.client;
+    el.onclick=()=>{const n=list.length,step=360/n;let t=-90-i*step;
+      while(t-target>180)t-=360;while(t-target<-180)t+=360;target=t;};
     ring.appendChild(el);
-    // long titles top out smaller so they never crowd their neighbours
-    const maxSize=Math.max(30,Math.min(56, 520/p.client.length));
+    const maxSize=Math.max(15,Math.min(27,280/p.client.length)); // ~half the previous scale
     items.push({el,p,maxSize});
   });
-  layout(true);
+  focusTo(list[0]);slotA=getTex(list[0].img);slotB=slotA;fade=0;fading=false;layout();
 }
-
-function layout(force){
-  const n=items.length, step=360/n;
-  let fIdx=0, fBest=1e9;
+function layout(){
+  const n=items.length,step=360/n;let fIdx=0,fBest=1e9;
   items.forEach((it,i)=>{
-    const deg=i*step+rot;
-    const a=deg*Math.PI/180;
-    const x=cx+Math.cos(a)*rx, y=cy+Math.sin(a)*ry;
-    // angular distance from the focus point (top, -90deg)
-    let d=(((deg+90)%360)+360)%360; if(d>180)d=360-d;
-    const near=Math.max(0,1-d/52);
-    const e=smooth(near);
-    const size=lerp(13,it.maxSize,e);
-    it.el.style.left=x+'px'; it.el.style.top=y+'px';
+    const deg=i*step+rot,a=deg*Math.PI/180;
+    const x=cx+Math.cos(a)*rx,y=cy+Math.sin(a)*ry;
+    let d=(((deg+90)%360)+360)%360;if(d>180)d=360-d;
+    const e=smooth(Math.max(0,1-d/52));
+    const size=lerp(8,it.maxSize,e);
+    const off=spin*7;                                   // chromatic smear as it spins
+    it.el.style.left=x+'px';it.el.style.top=y+'px';
     it.el.style.fontSize=size.toFixed(2)+'px';
     it.el.style.opacity=lerp(0.10,1,Math.pow(e,1.25)).toFixed(3);
     it.el.style.letterSpacing=lerp(0.05,-0.012,e).toFixed(4)+'em';
-    it.el.style.filter='blur('+lerp(2.3,0,e).toFixed(2)+'px)';
+    it.el.style.filter='blur('+(lerp(2.0,0,e)+spin*3.5).toFixed(2)+'px)';
     it.el.style.fontVariationSettings="'opsz' "+Math.min(144,size*1.7).toFixed(0)+", 'wght' "+lerp(330,560,e).toFixed(0);
+    it.el.style.transform='translate(-50%,-50%) scaleX('+(1+spin*0.16).toFixed(3)+')';
+    it.el.style.textShadow=off<0.4?'none':`${off.toFixed(1)}px 0 rgba(255,40,95,.6), ${(-off).toFixed(1)}px 0 rgba(0,210,255,.6)`;
     it.el.style.zIndex=Math.round(e*100);
     if(d<fBest){fBest=d;fIdx=i;}
   });
-  if(fIdx!==focus||force){ focus=fIdx; setBg(items[fIdx].p); }
+  if(fIdx!==focus){focus=fIdx;focusTo(items[fIdx].p);
+    metaEl.style.opacity=0;
+    setTimeout(()=>{const p=items[fIdx]&&items[fIdx].p;if(p){metaEl.textContent=`${p.year} · ${p.cat}`;metaEl.style.opacity=1;}},200);}
 }
 
-function setBg(p){
-  const next=bgs[bgFlip^1], cur=bgs[bgFlip];
-  next.style.backgroundImage=`url("${p.img}")`;
-  // force the transition to re-trigger from the scaled-in state
-  next.classList.remove('on'); void next.offsetWidth; next.classList.add('on');
-  cur.classList.remove('on'); bgFlip^=1;
-  metaEl.style.opacity=0;
-  setTimeout(()=>{ metaEl.textContent=`${p.year} · ${p.cat}`; metaEl.style.opacity=1; },220);
-}
-
-/* spin: wheel + drag, both feed a target the ring eases toward (inertia) */
-addEventListener('wheel',e=>{ e.preventDefault(); target+=e.deltaY*0.16; },{passive:false});
-let dragging=false, lastX=0, lastY=0;
-const stage=document.getElementById('stage');
-stage.addEventListener('pointerdown',e=>{ if(e.target.closest('.toggle,.back'))return;
-  dragging=true; lastX=e.clientX; lastY=e.clientY; });
-addEventListener('pointermove',e=>{ if(!dragging)return;
-  target+=((e.clientX-lastX)+(e.clientY-lastY))*0.25; lastX=e.clientX; lastY=e.clientY; });
-addEventListener('pointerup',()=>dragging=false);
-
+/* spin: wheel + drag → eased target */
+addEventListener('wheel',e=>{e.preventDefault();target+=e.deltaY*0.16;},{passive:false});
+let drag=false,lx=0,ly=0;const stage=document.getElementById('stage');
+stage.addEventListener('pointerdown',e=>{if(e.target.closest('.toggle,.back'))return;drag=true;lx=e.clientX;ly=e.clientY;});
+addEventListener('pointermove',e=>{if(!drag)return;target+=((e.clientX-lx)+(e.clientY-ly))*0.25;lx=e.clientX;ly=e.clientY;});
+addEventListener('pointerup',()=>drag=false);
 document.querySelectorAll('.toggle button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.toggle button').forEach(x=>x.classList.remove('on'));
-  b.classList.add('on'); build(b.dataset.cat);
-});
-addEventListener('resize',()=>{ dims(); layout(true); });
+  b.classList.add('on');build(b.dataset.cat);});
+addEventListener('resize',()=>{dims();layout();});
 
-function frame(){ rot+=(target-rot)*0.10; layout(false); requestAnimationFrame(frame); }
-dims(); build('Commercial'); frame();
+function frame(){
+  rot+=(target-rot)*0.10;
+  spin+=(Math.min(1,Math.abs(rot-prevRot)/5)-spin)*0.3;prevRot=rot;
+  layout();
+  if(fading){fade+=0.05;if(fade>=1){slotA=slotB;fading=false;fade=0;}}
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,slotA.tex);
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,(slotB||slotA).tex);
+  gl.uniform2fv(uCovA,cov(slotA.asp));gl.uniform2fv(uCovB,cov((slotB||slotA).asp));
+  gl.uniform1f(uFade,fading?smooth(Math.min(1,fade)):0);
+  gl.uniform1f(uVel,Math.min(1,spin));
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  requestAnimationFrame(frame);
+}
+dims();build('Commercial');frame();
 </script>
 </body>
 </html>
