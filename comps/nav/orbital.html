@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FOVEA — orbital v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..500&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{ --mono:"SF Mono",ui-monospace,Menlo,monospace; }
+  html,body{height:100%;background:#000;color:#fff;font-family:var(--mono);overflow:hidden;}
+  #stage{position:fixed;inset:0;overflow:hidden;cursor:grab;}
+  #stage:active{cursor:grabbing;}
+
+  /* full-bleed background — crossfades + slowly settles to the focused project */
+  .bg{position:absolute;inset:-4%;background-size:cover;background-position:center;
+    opacity:0;transform:scale(1.12);filter:brightness(.42) saturate(1.06);
+    transition:opacity .9s ease, transform 1.6s ease;}
+  .bg.on{opacity:1;transform:scale(1.03);}
+  .scrim{position:absolute;inset:0;pointer-events:none;z-index:2;
+    background:
+      radial-gradient(125% 95% at 50% 44%, rgba(0,0,0,0) 38%, rgba(0,0,0,.58) 100%),
+      linear-gradient(to bottom, rgba(0,0,0,.34), rgba(0,0,0,.12) 34%, rgba(0,0,0,.64));}
+
+  .square{position:absolute;left:18px;top:18px;width:68px;height:68px;background:#fff;color:#111;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;
+    letter-spacing:.08em;z-index:9;user-select:none;font-family:var(--mono);}
+
+  .ring{position:absolute;inset:0;z-index:5;}
+  .ring-item{position:absolute;left:0;top:0;white-space:nowrap;cursor:pointer;
+    font-family:"Fraunces",Georgia,serif;font-style:normal;color:#fff;
+    text-transform:uppercase;line-height:1;
+    will-change:transform,opacity,font-size,filter;transform:translate(-50%,-50%);}
+
+  /* meta caption — italic serif, the one editorial flourish; year · category only */
+  .meta{position:absolute;left:50%;bottom:8.5vh;transform:translateX(-50%);z-index:6;
+    font-family:"Fraunces",Georgia,serif;font-style:italic;font-weight:400;
+    font-size:15px;letter-spacing:.04em;color:rgba(255,255,255,.82);
+    transition:opacity .5s ease;text-shadow:0 2px 16px rgba(0,0,0,.6);}
+
+  .toggle{position:absolute;left:50%;bottom:3.4vh;transform:translateX(-50%);z-index:9;
+    display:flex;gap:6px;}
+  .toggle button{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+    color:rgba(255,255,255,.5);background:transparent;border:0;padding:6px 13px;border-radius:999px;cursor:pointer;}
+  .toggle button.on{background:rgba(255,255,255,.92);color:#000;}
+  .hint{position:absolute;right:20px;top:22px;z-index:9;font-family:var(--mono);font-size:10px;
+    letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.5);}
+  .back{position:absolute;left:18px;bottom:16px;z-index:9;font-family:var(--mono);font-size:10px;
+    letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.5);text-decoration:none;}
+  .back:hover{color:#fff;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="bg" id="bgA"></div>
+  <div class="bg" id="bgB"></div>
+  <div class="scrim"></div>
+
+  <div class="square">IAAH</div>
+  <div class="hint">Scroll / drag to spin</div>
+
+  <div class="ring" id="ring"></div>
+  <div class="meta" id="meta"></div>
+
+  <div class="toggle">
+    <button data-cat="Commercial" class="on">Commercial</button>
+    <button data-cat="Personal">Personal</button>
+  </div>
+  <a class="back" href="./">← comps</a>
+</div>
+
+<script>
+const P = [
+  ['GRISELDA','Commercial','griselda',2024],['FINESTKIND','Commercial','finestkind',2023],
+  ['SQSP REBRAND','Commercial','sqsp-rebrand',2023],['THE TRIAL','Commercial','the-trial',2023],
+  ['WETRANSFER X OUTERNET','Commercial','wetransfer-x-outernet',2022],['BURIAL','Commercial','burial',2021],
+  ['KATLA','Commercial','katla',2021],['HOW TO SELL DRUGS ONLINE FAST','Commercial','how-to-sell-drugs-online-fast',2020],
+  ['QUEENS GAMBIT','Commercial','queens-gambit',2020],['GRAND ARMY','Commercial','grand-army',2020],
+  ['DEAD MEN','Commercial','dead-men',2019],['SPEAK YOUR MIND','Commercial','speak-your-mind',2018],
+  ['SQSP. MAKE IT.','Commercial','squarespace-make-itt',2018],['SQUARESPACE — BUILD IT BEAUTIFUL','Commercial','squarespace-build-it-beautiful',2017],
+  ['SPIDERMAN','Commercial','spiderman',2012],['YOUNG GUNS 9','Commercial','young-guns-9',2011],
+  ['ALPHABET SOUP','Personal','alphabet-soup',2023],['BODY TYPE','Personal','body-type',2022],
+  ['IAAH REEL 2024','Personal','iaah-reel-2024',2024],['MOVEMENT','Personal','movement',2021],
+  ['NEUE FASHION','Personal','neue-fashion',2020],['THE CRITERION COLLECTION','Personal','the-criterion-collection',2019],
+  ['THE LAST OF US','Personal','the-last-of-us',2020],['TYPE AS FORM','Personal','type-as-form',2019],
+  ['IAAH HEADERS','Personal','iaah-headers',2018],
+].map(([client,cat,slug,year])=>({client,cat,slug,year,img:`../../content/iaah/${slug}/00.jpg`}));
+
+const ring=document.getElementById('ring'), metaEl=document.getElementById('meta');
+const bgs=[document.getElementById('bgA'),document.getElementById('bgB')];
+let items=[], list=[], rot=0, target=0, focus=-1, bgFlip=0, cx,cy,rx,ry;
+
+const lerp=(a,b,t)=>a+(b-a)*t;
+const smooth=t=>t*t*(3-2*t);
+
+function dims(){ const W=innerWidth,H=innerHeight;
+  cx=W/2; cy=H*0.52; rx=Math.min(W*0.40,600); ry=Math.min(H*0.42,380); }
+
+function build(cat){
+  ring.innerHTML=''; items=[]; rot=0; target=0; focus=-1;
+  list=P.filter(p=>p.cat===cat);
+  list.forEach((p,i)=>{
+    const el=document.createElement('div'); el.className='ring-item'; el.textContent=p.client;
+    el.onclick=()=>{ // bring this name to the top by the shortest path
+      const n=list.length, step=360/n; let t=-90 - i*step;
+      while(t-target>180)t-=360; while(t-target<-180)t+=360; target=t; };
+    ring.appendChild(el);
+    // long titles top out smaller so they never crowd their neighbours
+    const maxSize=Math.max(30,Math.min(56, 520/p.client.length));
+    items.push({el,p,maxSize});
+  });
+  layout(true);
+}
+
+function layout(force){
+  const n=items.length, step=360/n;
+  let fIdx=0, fBest=1e9;
+  items.forEach((it,i)=>{
+    const deg=i*step+rot;
+    const a=deg*Math.PI/180;
+    const x=cx+Math.cos(a)*rx, y=cy+Math.sin(a)*ry;
+    // angular distance from the focus point (top, -90deg)
+    let d=(((deg+90)%360)+360)%360; if(d>180)d=360-d;
+    const near=Math.max(0,1-d/52);
+    const e=smooth(near);
+    const size=lerp(13,it.maxSize,e);
+    it.el.style.left=x+'px'; it.el.style.top=y+'px';
+    it.el.style.fontSize=size.toFixed(2)+'px';
+    it.el.style.opacity=lerp(0.10,1,Math.pow(e,1.25)).toFixed(3);
+    it.el.style.letterSpacing=lerp(0.05,-0.012,e).toFixed(4)+'em';
+    it.el.style.filter='blur('+lerp(2.3,0,e).toFixed(2)+'px)';
+    it.el.style.fontVariationSettings="'opsz' "+Math.min(144,size*1.7).toFixed(0)+", 'wght' "+lerp(330,560,e).toFixed(0);
+    it.el.style.zIndex=Math.round(e*100);
+    if(d<fBest){fBest=d;fIdx=i;}
+  });
+  if(fIdx!==focus||force){ focus=fIdx; setBg(items[fIdx].p); }
+}
+
+function setBg(p){
+  const next=bgs[bgFlip^1], cur=bgs[bgFlip];
+  next.style.backgroundImage=`url("${p.img}")`;
+  // force the transition to re-trigger from the scaled-in state
+  next.classList.remove('on'); void next.offsetWidth; next.classList.add('on');
+  cur.classList.remove('on'); bgFlip^=1;
+  metaEl.style.opacity=0;
+  setTimeout(()=>{ metaEl.textContent=`${p.year} · ${p.cat}`; metaEl.style.opacity=1; },220);
+}
+
+/* spin: wheel + drag, both feed a target the ring eases toward (inertia) */
+addEventListener('wheel',e=>{ e.preventDefault(); target+=e.deltaY*0.16; },{passive:false});
+let dragging=false, lastX=0, lastY=0;
+const stage=document.getElementById('stage');
+stage.addEventListener('pointerdown',e=>{ if(e.target.closest('.toggle,.back'))return;
+  dragging=true; lastX=e.clientX; lastY=e.clientY; });
+addEventListener('pointermove',e=>{ if(!dragging)return;
+  target+=((e.clientX-lastX)+(e.clientY-lastY))*0.25; lastX=e.clientX; lastY=e.clientY; });
+addEventListener('pointerup',()=>dragging=false);
+
+document.querySelectorAll('.toggle button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.toggle button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); build(b.dataset.cat);
+});
+addEventListener('resize',()=>{ dims(); layout(true); });
+
+function frame(){ rot+=(target-rot)*0.10; layout(false); requestAnimationFrame(frame); }
+dims(); build('Commercial'); frame();
+</script>
+</body>
+</html>
