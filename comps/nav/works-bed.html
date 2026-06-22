@@ -9,16 +9,26 @@
   :root{ --mono:"SF Mono",ui-monospace,Menlo,monospace; }
   html,body{height:100%;background:#000;color:#fff;font-family:var(--mono);overflow:hidden;}
   #stage{position:fixed;inset:0;overflow:hidden;}
-  #gl{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1;cursor:grab;}
-  #gl.grabbing{cursor:grabbing;} #gl.hot{cursor:pointer;}
+  #gl{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1;cursor:default;}
+  #gl.hot{cursor:pointer;}
   .square{position:absolute;left:18px;top:18px;width:60px;height:60px;background:#fff;color:#111;
     display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;
     letter-spacing:.08em;z-index:9;user-select:none;cursor:pointer;}
   .square.paused{background:#111;color:#fff;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.85);}
   .title{position:absolute;left:50%;top:24px;transform:translateX(-50%);z-index:9;
     font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:rgba(255,255,255,.85);}
-  .hint{position:absolute;right:20px;top:24px;z-index:9;font-size:10px;letter-spacing:.16em;
-    text-transform:uppercase;color:rgba(255,255,255,.45);text-align:right;line-height:1.7;}
+  .modes{position:absolute;right:18px;top:20px;z-index:9;display:flex;gap:5px;}
+  .modes button{font:inherit;font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+    color:rgba(255,255,255,.5);background:transparent;border:1px solid rgba(255,255,255,.18);
+    padding:5px 11px;border-radius:999px;cursor:pointer;}
+  .modes button.on{background:rgba(255,255,255,.92);color:#000;border-color:transparent;}
+  .hint{position:absolute;right:18px;top:54px;z-index:9;font-size:9px;letter-spacing:.14em;
+    text-transform:uppercase;color:rgba(255,255,255,.4);text-align:right;}
+  /* the centre reticle — shows what you'll enter in Point mode */
+  .retic{position:absolute;left:50%;top:50%;width:var(--rw,180px);height:var(--rh,120px);
+    transform:translate(-50%,-50%);z-index:7;pointer-events:none;border:1px solid rgba(255,255,255,.5);
+    opacity:0;transition:opacity .3s;}
+  .retic.on{opacity:.8;}
   .cap{position:absolute;left:50%;bottom:8vh;transform:translateX(-50%);z-index:8;pointer-events:none;
     font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#fff;text-shadow:0 2px 14px #000;
     opacity:0;transition:opacity .25s;white-space:nowrap;}
@@ -31,7 +41,7 @@
     text-transform:uppercase;color:rgba(255,255,255,.5);text-decoration:none;}
   .back:hover{color:#fff;}
   .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:20;}
-  .flash.go{animation:fl .6s ease;} @keyframes fl{0%{opacity:.8}100%{opacity:0}}
+  .flash.go{animation:fl .55s ease;} @keyframes fl{0%{opacity:.72}100%{opacity:0}}
 </style>
 </head>
 <body>
@@ -39,7 +49,12 @@
   <canvas id="gl"></canvas>
   <div class="square" id="square">IAAH</div>
   <div class="title">Works</div>
-  <div class="hint">▣ square · tempo<br>drag · move the bed<br>click · enter</div>
+  <div class="modes" id="modes">
+    <button data-mode="point" class="on">Point</button>
+    <button data-mode="scroll">Scroll</button>
+  </div>
+  <div class="hint" id="hint"></div>
+  <div class="retic" id="retic"></div>
   <div class="cap" id="cap"></div>
   <div class="toggle">
     <button data-cat="Commercial" class="on">Commercial</button>
@@ -66,23 +81,22 @@ const P = [
   ['IAAH HEADERS','Personal','iaah-headers',2018],
 ].map(([client,cat,slug,year])=>({client,cat,slug,year,img:`../../content/iaah/${slug}/00.jpg`}));
 
-const cv=document.getElementById('gl'), cap=document.getElementById('cap'), sq=document.getElementById('square');
+const cv=document.getElementById('gl'),cap=document.getElementById('cap'),sq=document.getElementById('square'),
+      retic=document.getElementById('retic'),hintEl=document.getElementById('hint');
 const gl=cv.getContext('webgl',{antialias:true});
-const TW=230, TH=150, GAP=10, DISP=0.85;   // tile size, gap, resting lens depth
+const TW=230,TH=150,GAP=10,DISP=0.85,STEER=7;
 
-// ── program A: draw the grid of thumbnails into an offscreen buffer ──
 const gridVS=`attribute vec2 aUV;uniform vec4 uRect;varying vec2 vUv;
 void main(){vUv=aUV;gl_Position=vec4(uRect.xy+aUV*uRect.zw,0.,1.);}`;
 const gridFS=`precision highp float;varying vec2 vUv;uniform sampler2D uTex;uniform vec2 uCov;uniform float uB;
 vec2 fit(vec2 c,vec2 cov){return (c-0.5)*cov+0.5;}
 void main(){gl_FragColor=vec4(texture2D(uTex,fit(vUv,uCov)).rgb*uB,1.0);}`;
-// ── program B: the lens-tunnel pass over the WHOLE bed (one global lens) ──
 const lensVS=`attribute vec2 aUV;varying vec2 vUv;void main(){vUv=aUV;gl_Position=vec4(aUV*2.0-1.0,0.,1.);}`;
 const lensFS=`precision highp float;varying vec2 vUv;
 uniform sampler2D uTex;uniform float uTime,uScrollDif,uZoom;uniform vec2 uZoomC;
 const float TS=0.4,SF=10.1,SA=1.0;
 void main(){
-  vec2 uv=(vUv-uZoomC)*(1.0-uZoom*0.93)+uZoomC;      // zoom toward the click on enter
+  vec2 uv=(vUv-uZoomC)*(1.0-uZoom*0.93)+uZoomC;
   float disp=${DISP.toFixed(2)}+uZoom*1.7;
   vec2 cVuv=uv-0.5;
   float outCircle=(0.5-length(cVuv))*(TS*10.0);
@@ -101,10 +115,10 @@ function mk(vs,fs){const p=gl.createProgram();
   const a=gl.createShader(gl.VERTEX_SHADER);gl.shaderSource(a,vs);gl.compileShader(a);gl.attachShader(p,a);
   const b=gl.createShader(gl.FRAGMENT_SHADER);gl.shaderSource(b,fs);gl.compileShader(b);gl.attachShader(p,b);
   gl.linkProgram(p);return p;}
-const grid=mk(gridVS,gridFS), lens=mk(lensVS,lensFS);
+const grid=mk(gridVS,gridFS),lens=mk(lensVS,lensFS);
 const quad=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,quad);
 gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([0,0,1,0,0,1,0,1,1,0,1,1]),gl.STATIC_DRAW);
-const gA=gl.getAttribLocation(grid,'aUV'), lA=gl.getAttribLocation(lens,'aUV');
+const gA=gl.getAttribLocation(grid,'aUV'),lA=gl.getAttribLocation(lens,'aUV');
 const gRect=gl.getUniformLocation(grid,'uRect'),gCov=gl.getUniformLocation(grid,'uCov'),gB=gl.getUniformLocation(grid,'uB');
 const lTime=gl.getUniformLocation(lens,'uTime'),lScr=gl.getUniformLocation(lens,'uScrollDif'),
       lZoom=gl.getUniformLocation(lens,'uZoom'),lZC=gl.getUniformLocation(lens,'uZoomC');
@@ -121,9 +135,8 @@ function getTex(url){
     gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,im);t.asp=im.naturalWidth/im.naturalHeight;};
   im.src=url;texCache[url]=t;return t;
 }
-
-let fbo,fboTex,fboW=0;
-function makeFBO(){ fboW=cv.width;
+let fbo,fboTex;
+function makeFBO(){
   if(fboTex)gl.deleteTexture(fboTex); if(fbo)gl.deleteFramebuffer(fbo);
   fboTex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,fboTex);
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,cv.width,cv.height,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
@@ -134,36 +147,46 @@ function makeFBO(){ fboW=cv.width;
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);
 }
 
-let list=[], ox=0, oy=0, pox=0, poy=0, vel=0, playing=true, t0=performance.now();
-let hovC=1e9, hovR=1e9, zoom=0, zoomC=[0.5,0.5], zooming=false;
-const W=()=>innerWidth, H=()=>innerHeight;
-function setCat(cat){ list=P.filter(p=>p.cat===cat); list.forEach(p=>p.t=getTex(p.img)); ox=0;oy=0; }
+let list=[],ox=0,oy=0,pox=0,poy=0,vel=0,playing=true,t0=performance.now();
+let zoom=0,zoomC=[0.5,0.5],diveActive=false,panTX=0,panTY=0;
+let mode='point',mx=0,my=0,hasMouse=false,hoverPt=null,lastFocus='';
+const W=()=>innerWidth,H=()=>innerHeight;
+function setCat(cat){ list=P.filter(p=>p.cat===cat); list.forEach(p=>p.t=getTex(p.img)); }
 function cell(c,r){ const N=list.length; return list[(((c+r*7)%N)+N)%N]; }   // staggered infinite wrap
 function cov(asp){const ta=(TW-GAP)/(TH-GAP);return asp>ta?[ta/asp,1]:[1,asp/ta];}
-
 function clip(px,py,pw,ph){return [px/W()*2-1,1-(py+ph)/H()*2,pw/W()*2,ph/H()*2];}
+function cellAt(cxpx,cypx){   // screen point → bed cell (through the lens)
+  const u=[cxpx/W(),1-cypx/H()];
+  const dx=u[0]-0.5,dy=u[1]-0.5,len=Math.hypot(dx,dy);
+  const outCircle=(0.5-len)*(0.4*10),bs=1+0.5*DISP-(1-outCircle)*DISP*0.5;
+  const n=[dx*bs+0.5,dy*bs+0.5];
+  return { c:Math.floor((n[0]*W()-ox)/TW), r:Math.floor(((1-n[1])*H()-oy)/TH) };
+}
+const focusCell=()=> mode==='point' ? cellAt(W()/2,H()/2) : (hoverPt?cellAt(hoverPt[0],hoverPt[1]):cellAt(W()/2,H()/2));
+
 function frame(now){
   const dpr=Math.min(2,devicePixelRatio||1);
   if(cv.width!==W()*dpr){cv.width=W()*dpr;cv.height=H()*dpr;makeFBO();}
-  if(!zooming){ if(playing && !drag){ ox+=0.28; oy+=0.16; } }
+  if(diveActive){ ox+=(panTX-ox)*0.12; oy+=(panTY-oy)*0.12; }
+  else{ if(mode==='point'&&hasMouse){ ox-=mx*STEER; oy-=my*STEER; } if(playing){ ox+=0.22; oy+=0.12; } }
+  zoom+=((diveActive?1:0)-zoom)*0.12;
   vel=Math.min(46,Math.hypot(ox-pox,oy-poy)*1.3); pox=ox;poy=oy;
-  if(zooming) zoom+=(1-zoom)*0.10;
+  const fc=diveActive?null:focusCell();
+  if(fc){ const key=fc.c+','+fc.r; if(key!==lastFocus){ lastFocus=key; const p=cell(fc.c,fc.r);
+    cap.innerHTML=`${p.client}<span class="yr">${p.year}</span>`; cap.style.opacity=1; } }
 
-  // PASS 1 — draw the bed of thumbnails into the FBO
   gl.bindFramebuffer(gl.FRAMEBUFFER,fbo); gl.viewport(0,0,cv.width,cv.height);
   gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
   gl.useProgram(grid); gl.bindBuffer(gl.ARRAY_BUFFER,quad);
   gl.enableVertexAttribArray(gA); gl.vertexAttribPointer(gA,2,gl.FLOAT,false,0,0);
-  const c0=Math.floor(-ox/TW)-1, c1=Math.ceil((W()-ox)/TW)+1;
-  const r0=Math.floor(-oy/TH)-1, r1=Math.ceil((H()-oy)/TH)+1;
+  const c0=Math.floor(-ox/TW)-1,c1=Math.ceil((W()-ox)/TW)+1,r0=Math.floor(-oy/TH)-1,r1=Math.ceil((H()-oy)/TH)+1;
   for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++){
-    const p=cell(c,r); const px=c*TW+ox+GAP/2, py=r*TH+oy+GAP/2;
+    const p=cell(c,r),px=c*TW+ox+GAP/2,py=r*TH+oy+GAP/2;
     gl.uniform4fv(gRect,clip(px,py,TW-GAP,TH-GAP));
     gl.uniform2fv(gCov,cov(p.t.asp));
-    gl.uniform1f(gB,(c===hovC&&r===hovR&&!zooming)?1.25:0.82);
+    gl.uniform1f(gB,(fc&&c===fc.c&&r===fc.r)?1.22:0.82);
     gl.bindTexture(gl.TEXTURE_2D,p.t.tex); gl.drawArrays(gl.TRIANGLES,0,6);
   }
-  // PASS 2 — one lens-tunnel over the whole bed
   gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,cv.width,cv.height);
   gl.useProgram(lens); gl.bindBuffer(gl.ARRAY_BUFFER,quad);
   gl.enableVertexAttribArray(lA); gl.vertexAttribPointer(lA,2,gl.FLOAT,false,0,0);
@@ -174,37 +197,42 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 
-// map a screen point through the lens to the bed cell under it
-function cellAt(cxpx,cypx){
-  const u=[cxpx/W(), 1-cypx/H()];                     // screen uv (y up)
-  const dx=u[0]-0.5, dy=u[1]-0.5, len=Math.hypot(dx,dy);
-  const outCircle=(0.5-len)*(0.4*10), bs=1+0.5*DISP-(1-outCircle)*DISP*0.5;
-  const n=[dx*bs+0.5, dy*bs+0.5];                      // fbo uv
-  const sx=n[0]*W(), sy=(1-n[1])*H();                  // back to screen px
-  return { c:Math.floor((sx-ox)/TW), r:Math.floor((sy-oy)/TH) };
+// refined dive: glide the focused cover to centre, then zoom through the lens
+function enter(){
+  if(diveActive) return;
+  const k=focusCell();
+  panTX=W()/2-(k.c+0.5)*TW; panTY=H()/2-(k.r+0.5)*TH;
+  diveActive=true; cap.style.opacity=0; retic.classList.remove('on'); cv.classList.remove('hot');
+  setTimeout(()=>{const f=document.getElementById('flash');f.classList.remove('go');void f.offsetWidth;f.classList.add('go');},540);
+  setTimeout(()=>{ diveActive=false; },1180);   // (real site: hands off to the project here)
 }
 
-let drag=false,lx=0,ly=0,moved=0;
-cv.addEventListener('pointerdown',e=>{ if(zooming)return; drag=true;moved=0;lx=e.clientX;ly=e.clientY;cv.classList.add('grabbing'); });
-addEventListener('pointermove',e=>{
-  if(drag){ const dx=e.clientX-lx,dy=e.clientY-ly; ox+=dx;oy+=dy;moved+=Math.abs(dx)+Math.abs(dy);lx=e.clientX;ly=e.clientY; }
-  else if(!zooming){ const k=cellAt(e.clientX,e.clientY); hovC=k.c;hovR=k.r; const p=cell(k.c,k.r);
-    cap.innerHTML=`${p.client}<span class="yr">${p.year}</span>`; cap.style.opacity=1; cv.classList.add('hot'); }
+addEventListener('pointermove',e=>{ if(e.pointerType==='touch')return;
+  hasMouse=true; mx=(e.clientX/W()-0.5)*2; my=(e.clientY/H()-0.5)*2;
+  if(mode==='scroll') hoverPt=[e.clientX,e.clientY];
+  if(!diveActive) cv.classList.add('hot');
 });
-addEventListener('pointerup',e=>{
-  cv.classList.remove('grabbing');
-  if(drag && moved<6 && !zooming){ const k=cellAt(e.clientX,e.clientY); const p=cell(k.c,k.r);
-    zoomC=[e.clientX/W(), 1-e.clientY/H()]; zoom=0; zooming=true; cap.style.opacity=0;
-    setTimeout(()=>{const f=document.getElementById('flash');f.classList.remove('go');void f.offsetWidth;f.classList.add('go');},520);
-    setTimeout(()=>{zooming=false;zoom=0;},1150);
-  }
-  drag=false;
-});
+cv.addEventListener('click',()=>{ if(!diveActive) enter(); });
+addEventListener('wheel',e=>{ if(diveActive||mode!=='scroll')return; e.preventDefault(); ox-=e.deltaX; oy-=e.deltaY; },{passive:false});
+
+let tx=0,ty=0,tmoved=0,touching=false;
+cv.addEventListener('touchstart',e=>{const t=e.touches[0];tx=t.clientX;ty=t.clientY;tmoved=0;touching=true;hoverPt=[tx,ty];},{passive:true});
+cv.addEventListener('touchmove',e=>{ if(diveActive)return; const t=e.touches[0];
+  const dx=t.clientX-tx,dy=t.clientY-ty; ox+=dx;oy+=dy;tmoved+=Math.abs(dx)+Math.abs(dy);tx=t.clientX;ty=t.clientY;hoverPt=[t.clientX,t.clientY]; },{passive:true});
+cv.addEventListener('touchend',()=>{ if(touching&&tmoved<8&&!diveActive){ hoverPt=[tx,ty]; enter(); } touching=false; });
+
 sq.onclick=()=>{ playing=!playing; sq.classList.toggle('paused',!playing); };
+function setMode(m){ mode=m;
+  document.querySelectorAll('.modes button').forEach(b=>b.classList.toggle('on',b.dataset.mode===m));
+  hintEl.textContent = m==='point' ? 'move mouse to steer · click to enter centred' : 'scroll / swipe to move · click a cover';
+  retic.classList.toggle('on', m==='point');
+  retic.style.setProperty('--rw',(TW-GAP)+'px'); retic.style.setProperty('--rh',(TH-GAP)+'px');
+}
+document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
 document.querySelectorAll('.toggle button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.toggle button').forEach(x=>x.classList.remove('on'));
   b.classList.add('on'); setCat(b.dataset.cat); });
-setCat('Commercial'); requestAnimationFrame(frame);
+setMode('point'); setCat('Commercial'); requestAnimationFrame(frame);
 </script>
 </body>
 </html>
