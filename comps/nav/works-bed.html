@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FOVEA — works bed</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{ --mono:"SF Mono",ui-monospace,Menlo,monospace; }
+  html,body{height:100%;background:#000;color:#fff;font-family:var(--mono);overflow:hidden;}
+  #stage{position:fixed;inset:0;overflow:hidden;}
+  #gl{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1;cursor:grab;}
+  #gl.grabbing{cursor:grabbing;} #gl.hot{cursor:pointer;}
+  .square{position:absolute;left:18px;top:18px;width:60px;height:60px;background:#fff;color:#111;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;
+    letter-spacing:.08em;z-index:9;user-select:none;cursor:pointer;}
+  .square.paused{background:#111;color:#fff;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.85);}
+  .title{position:absolute;left:50%;top:24px;transform:translateX(-50%);z-index:9;
+    font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:rgba(255,255,255,.85);}
+  .hint{position:absolute;right:20px;top:24px;z-index:9;font-size:10px;letter-spacing:.16em;
+    text-transform:uppercase;color:rgba(255,255,255,.45);text-align:right;line-height:1.7;}
+  .cap{position:absolute;left:50%;bottom:8vh;transform:translateX(-50%);z-index:8;pointer-events:none;
+    font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#fff;text-shadow:0 2px 14px #000;
+    opacity:0;transition:opacity .25s;white-space:nowrap;}
+  .cap .yr{margin-left:10px;font-size:10px;letter-spacing:.18em;color:rgba(255,255,255,.6);}
+  .toggle{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:9;display:flex;gap:6px;}
+  .toggle button{font:inherit;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+    color:rgba(255,255,255,.5);background:transparent;border:0;padding:6px 13px;border-radius:999px;cursor:pointer;}
+  .toggle button.on{background:rgba(255,255,255,.92);color:#000;}
+  .back{position:absolute;left:18px;bottom:18px;z-index:9;font-size:10px;letter-spacing:.16em;
+    text-transform:uppercase;color:rgba(255,255,255,.5);text-decoration:none;}
+  .back:hover{color:#fff;}
+  .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:20;}
+  .flash.go{animation:fl .6s ease;} @keyframes fl{0%{opacity:.8}100%{opacity:0}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="gl"></canvas>
+  <div class="square" id="square">IAAH</div>
+  <div class="title">Works</div>
+  <div class="hint">▣ square · tempo<br>drag · move the bed<br>click · enter</div>
+  <div class="cap" id="cap"></div>
+  <div class="toggle">
+    <button data-cat="Commercial" class="on">Commercial</button>
+    <button data-cat="Personal">Personal</button>
+  </div>
+  <a class="back" href="./">← comps</a>
+  <div class="flash" id="flash"></div>
+</div>
+
+<script>
+const P = [
+  ['GRISELDA','Commercial','griselda',2024],['FINESTKIND','Commercial','finestkind',2023],
+  ['SQSP REBRAND','Commercial','sqsp-rebrand',2023],['THE TRIAL','Commercial','the-trial',2023],
+  ['WETRANSFER X OUTERNET','Commercial','wetransfer-x-outernet',2022],['BURIAL','Commercial','burial',2021],
+  ['KATLA','Commercial','katla',2021],['HOW TO SELL DRUGS ONLINE FAST','Commercial','how-to-sell-drugs-online-fast',2020],
+  ['QUEENS GAMBIT','Commercial','queens-gambit',2020],['GRAND ARMY','Commercial','grand-army',2020],
+  ['DEAD MEN','Commercial','dead-men',2019],['SPEAK YOUR MIND','Commercial','speak-your-mind',2018],
+  ['SQSP. MAKE IT.','Commercial','squarespace-make-itt',2018],['SQUARESPACE — BUILD IT BEAUTIFUL','Commercial','squarespace-build-it-beautiful',2017],
+  ['SPIDERMAN','Commercial','spiderman',2012],['YOUNG GUNS 9','Commercial','young-guns-9',2011],
+  ['ALPHABET SOUP','Personal','alphabet-soup',2023],['BODY TYPE','Personal','body-type',2022],
+  ['IAAH REEL 2024','Personal','iaah-reel-2024',2024],['MOVEMENT','Personal','movement',2021],
+  ['NEUE FASHION','Personal','neue-fashion',2020],['THE CRITERION COLLECTION','Personal','the-criterion-collection',2019],
+  ['THE LAST OF US','Personal','the-last-of-us',2020],['TYPE AS FORM','Personal','type-as-form',2019],
+  ['IAAH HEADERS','Personal','iaah-headers',2018],
+].map(([client,cat,slug,year])=>({client,cat,slug,year,img:`../../content/iaah/${slug}/00.jpg`}));
+
+const cv=document.getElementById('gl'), cap=document.getElementById('cap'), sq=document.getElementById('square');
+const gl=cv.getContext('webgl',{antialias:true});
+const TW=230, TH=150, GAP=10, DISP=0.85;   // tile size, gap, resting lens depth
+
+// ── program A: draw the grid of thumbnails into an offscreen buffer ──
+const gridVS=`attribute vec2 aUV;uniform vec4 uRect;varying vec2 vUv;
+void main(){vUv=aUV;gl_Position=vec4(uRect.xy+aUV*uRect.zw,0.,1.);}`;
+const gridFS=`precision highp float;varying vec2 vUv;uniform sampler2D uTex;uniform vec2 uCov;uniform float uB;
+vec2 fit(vec2 c,vec2 cov){return (c-0.5)*cov+0.5;}
+void main(){gl_FragColor=vec4(texture2D(uTex,fit(vUv,uCov)).rgb*uB,1.0);}`;
+// ── program B: the lens-tunnel pass over the WHOLE bed (one global lens) ──
+const lensVS=`attribute vec2 aUV;varying vec2 vUv;void main(){vUv=aUV;gl_Position=vec4(aUV*2.0-1.0,0.,1.);}`;
+const lensFS=`precision highp float;varying vec2 vUv;
+uniform sampler2D uTex;uniform float uTime,uScrollDif,uZoom;uniform vec2 uZoomC;
+const float TS=0.4,SF=10.1,SA=1.0;
+void main(){
+  vec2 uv=(vUv-uZoomC)*(1.0-uZoom*0.93)+uZoomC;      // zoom toward the click on enter
+  float disp=${DISP.toFixed(2)}+uZoom*1.7;
+  vec2 cVuv=uv-0.5;
+  float outCircle=(0.5-length(cVuv))*(TS*10.0);
+  vec2 n=uv-0.5;
+  float baseScale=1.0+0.5*disp-(1.0-outCircle)*disp*0.5;
+  n*=baseScale;
+  float lum1=dot(texture2D(uTex,n+0.5).rgb,vec3(0.3333));
+  n.y*=1.0 - sin(uTime*0.001+uv.x*SF+lum1*SF)*uScrollDif*0.01*SA;
+  n+=0.5;
+  vec3 col=texture2D(uTex,n).rgb;
+  float r=length(vUv-0.5);
+  col*=1.0-0.34*smoothstep(0.55,1.18,r);
+  gl_FragColor=vec4(col,1.0);
+}`;
+function mk(vs,fs){const p=gl.createProgram();
+  const a=gl.createShader(gl.VERTEX_SHADER);gl.shaderSource(a,vs);gl.compileShader(a);gl.attachShader(p,a);
+  const b=gl.createShader(gl.FRAGMENT_SHADER);gl.shaderSource(b,fs);gl.compileShader(b);gl.attachShader(p,b);
+  gl.linkProgram(p);return p;}
+const grid=mk(gridVS,gridFS), lens=mk(lensVS,lensFS);
+const quad=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,quad);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([0,0,1,0,0,1,0,1,1,0,1,1]),gl.STATIC_DRAW);
+const gA=gl.getAttribLocation(grid,'aUV'), lA=gl.getAttribLocation(lens,'aUV');
+const gRect=gl.getUniformLocation(grid,'uRect'),gCov=gl.getUniformLocation(grid,'uCov'),gB=gl.getUniformLocation(grid,'uB');
+const lTime=gl.getUniformLocation(lens,'uTime'),lScr=gl.getUniformLocation(lens,'uScrollDif'),
+      lZoom=gl.getUniformLocation(lens,'uZoom'),lZC=gl.getUniformLocation(lens,'uZoomC');
+
+const texCache={};
+function getTex(url){
+  if(texCache[url])return texCache[url];
+  const t={tex:gl.createTexture(),asp:1.5};
+  gl.bindTexture(gl.TEXTURE_2D,t.tex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([16,16,16,255]));
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  const im=new Image();im.onload=()=>{gl.bindTexture(gl.TEXTURE_2D,t.tex);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,im);t.asp=im.naturalWidth/im.naturalHeight;};
+  im.src=url;texCache[url]=t;return t;
+}
+
+let fbo,fboTex,fboW=0;
+function makeFBO(){ fboW=cv.width;
+  if(fboTex)gl.deleteTexture(fboTex); if(fbo)gl.deleteFramebuffer(fbo);
+  fboTex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,fboTex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,cv.width,cv.height,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  fbo=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,fboTex,0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+}
+
+let list=[], ox=0, oy=0, pox=0, poy=0, vel=0, playing=true, t0=performance.now();
+let hovC=1e9, hovR=1e9, zoom=0, zoomC=[0.5,0.5], zooming=false;
+const W=()=>innerWidth, H=()=>innerHeight;
+function setCat(cat){ list=P.filter(p=>p.cat===cat); list.forEach(p=>p.t=getTex(p.img)); ox=0;oy=0; }
+function cell(c,r){ const N=list.length; return list[(((c+r*7)%N)+N)%N]; }   // staggered infinite wrap
+function cov(asp){const ta=(TW-GAP)/(TH-GAP);return asp>ta?[ta/asp,1]:[1,asp/ta];}
+
+function clip(px,py,pw,ph){return [px/W()*2-1,1-(py+ph)/H()*2,pw/W()*2,ph/H()*2];}
+function frame(now){
+  const dpr=Math.min(2,devicePixelRatio||1);
+  if(cv.width!==W()*dpr){cv.width=W()*dpr;cv.height=H()*dpr;makeFBO();}
+  if(!zooming){ if(playing && !drag){ ox+=0.28; oy+=0.16; } }
+  vel=Math.min(46,Math.hypot(ox-pox,oy-poy)*1.3); pox=ox;poy=oy;
+  if(zooming) zoom+=(1-zoom)*0.10;
+
+  // PASS 1 — draw the bed of thumbnails into the FBO
+  gl.bindFramebuffer(gl.FRAMEBUFFER,fbo); gl.viewport(0,0,cv.width,cv.height);
+  gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.useProgram(grid); gl.bindBuffer(gl.ARRAY_BUFFER,quad);
+  gl.enableVertexAttribArray(gA); gl.vertexAttribPointer(gA,2,gl.FLOAT,false,0,0);
+  const c0=Math.floor(-ox/TW)-1, c1=Math.ceil((W()-ox)/TW)+1;
+  const r0=Math.floor(-oy/TH)-1, r1=Math.ceil((H()-oy)/TH)+1;
+  for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++){
+    const p=cell(c,r); const px=c*TW+ox+GAP/2, py=r*TH+oy+GAP/2;
+    gl.uniform4fv(gRect,clip(px,py,TW-GAP,TH-GAP));
+    gl.uniform2fv(gCov,cov(p.t.asp));
+    gl.uniform1f(gB,(c===hovC&&r===hovR&&!zooming)?1.25:0.82);
+    gl.bindTexture(gl.TEXTURE_2D,p.t.tex); gl.drawArrays(gl.TRIANGLES,0,6);
+  }
+  // PASS 2 — one lens-tunnel over the whole bed
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,cv.width,cv.height);
+  gl.useProgram(lens); gl.bindBuffer(gl.ARRAY_BUFFER,quad);
+  gl.enableVertexAttribArray(lA); gl.vertexAttribPointer(lA,2,gl.FLOAT,false,0,0);
+  gl.bindTexture(gl.TEXTURE_2D,fboTex);
+  gl.uniform1f(lTime,(now||0)-t0); gl.uniform1f(lScr,vel);
+  gl.uniform1f(lZoom,zoom); gl.uniform2fv(lZC,zoomC);
+  gl.drawArrays(gl.TRIANGLES,0,6);
+  requestAnimationFrame(frame);
+}
+
+// map a screen point through the lens to the bed cell under it
+function cellAt(cxpx,cypx){
+  const u=[cxpx/W(), 1-cypx/H()];                     // screen uv (y up)
+  const dx=u[0]-0.5, dy=u[1]-0.5, len=Math.hypot(dx,dy);
+  const outCircle=(0.5-len)*(0.4*10), bs=1+0.5*DISP-(1-outCircle)*DISP*0.5;
+  const n=[dx*bs+0.5, dy*bs+0.5];                      // fbo uv
+  const sx=n[0]*W(), sy=(1-n[1])*H();                  // back to screen px
+  return { c:Math.floor((sx-ox)/TW), r:Math.floor((sy-oy)/TH) };
+}
+
+let drag=false,lx=0,ly=0,moved=0;
+cv.addEventListener('pointerdown',e=>{ if(zooming)return; drag=true;moved=0;lx=e.clientX;ly=e.clientY;cv.classList.add('grabbing'); });
+addEventListener('pointermove',e=>{
+  if(drag){ const dx=e.clientX-lx,dy=e.clientY-ly; ox+=dx;oy+=dy;moved+=Math.abs(dx)+Math.abs(dy);lx=e.clientX;ly=e.clientY; }
+  else if(!zooming){ const k=cellAt(e.clientX,e.clientY); hovC=k.c;hovR=k.r; const p=cell(k.c,k.r);
+    cap.innerHTML=`${p.client}<span class="yr">${p.year}</span>`; cap.style.opacity=1; cv.classList.add('hot'); }
+});
+addEventListener('pointerup',e=>{
+  cv.classList.remove('grabbing');
+  if(drag && moved<6 && !zooming){ const k=cellAt(e.clientX,e.clientY); const p=cell(k.c,k.r);
+    zoomC=[e.clientX/W(), 1-e.clientY/H()]; zoom=0; zooming=true; cap.style.opacity=0;
+    setTimeout(()=>{const f=document.getElementById('flash');f.classList.remove('go');void f.offsetWidth;f.classList.add('go');},520);
+    setTimeout(()=>{zooming=false;zoom=0;},1150);
+  }
+  drag=false;
+});
+sq.onclick=()=>{ playing=!playing; sq.classList.toggle('paused',!playing); };
+document.querySelectorAll('.toggle button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.toggle button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); setCat(b.dataset.cat); });
+setCat('Commercial'); requestAnimationFrame(frame);
+</script>
+</body>
+</html>
