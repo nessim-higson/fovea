@@ -166,7 +166,10 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     diveActive = true; zoomC = [0.5, 0.5]; cap.style.opacity = 0;
     flashEl.classList.remove('go'); void flashEl.offsetWidth;
     setTimeout(() => flashEl.classList.add('go'), 520);
-    setTimeout(() => { onEnter(o.gi); close(true); }, 560);   // hand off to the project
+    // unlock the page BEFORE the handoff — diveToProject scrollTo()s to the
+    // project's spot, and that's clamped to 0 while body.overflow is hidden
+    // (which made the engine then scroll back through every project).
+    setTimeout(() => { document.body.style.overflow = ''; onEnter(o.gi); close(true); }, 560);
   }
 
   // input — scroll / swipe to move, click / tap to enter
