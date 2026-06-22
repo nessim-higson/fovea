@@ -119,7 +119,11 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
   function cov(asp) { const ta = (TW - GAP) / (TH - GAP); return asp > ta ? [ta / asp, 1] : [1, asp / ta]; }
   function clip(px, py, pw, ph) { return [px / W() * 2 - 1, 1 - (py + ph) / H() * 2, pw / W() * 2, ph / H() * 2]; }
   function cellAt(cxpx, cypx) {
-    const u = [cxpx / W(), 1 - cypx / H()], dx = u[0] - 0.5, dy = u[1] - 0.5, len = Math.hypot(dx, dy);
+    const z = Math.max(0, zoom);
+    let ux = cxpx / W(), uy = 1 - cypx / H();
+    ux = (ux - zoomC[0]) * (1 - z * 0.93) + zoomC[0];   // undo the lens zoom first
+    uy = (uy - zoomC[1]) * (1 - z * 0.93) + zoomC[1];
+    const dx = ux - 0.5, dy = uy - 0.5, len = Math.hypot(dx, dy);
     const outCircle = (0.5 - len) * 4, bs = 1 + 0.5 * DISP - (1 - outCircle) * DISP * 0.5;
     const n = [dx * bs + 0.5, dy * bs + 0.5];
     return { c: Math.floor((n[0] * W() - ox) / TW), r: Math.floor(((1 - n[1]) * H() - oy) / TH) };
@@ -130,8 +134,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     if (!running) return;
     const dpr = Math.min(COARSE ? 1.25 : 2, devicePixelRatio || 1);
     if (cv.width !== W() * dpr) { cv.width = W() * dpr; cv.height = H() * dpr; makeFBO(); }
-    if (diveActive) { ox += (panTX - ox) * 0.12; oy += (panTY - oy) * 0.12; }
-    else if (Math.abs(zoom) < 0.03 && zoomTarget === 0 && (isPlaying ? isPlaying() : true)) { ox += 0.22; oy += 0.16; }
+    if (!diveActive && Math.abs(zoom) < 0.03 && zoomTarget === 0 && (isPlaying ? isPlaying() : true)) { ox += 0.22; oy += 0.16; }
     zoom += ((diveActive ? 1 : zoomTarget) - zoom) * 0.1;
     vel = Math.min(46, Math.hypot(ox - pox, oy - poy) * 1.3); pox = ox; poy = oy;
     const fc = diveActive ? null : focusCell();
@@ -161,9 +164,11 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
 
   function enter() {
     if (diveActive) return;
-    const k = focusCell(); const o = cell(k.c, k.r);
-    panTX = W() / 2 - (k.c + 0.5) * TW; panTY = H() / 2 - (k.r + 0.5) * TH;
-    diveActive = true; zoomC = [0.5, 0.5]; cap.style.opacity = 0;
+    const p = hoverPt || [W() / 2, H() / 2];
+    const k = cellAt(p[0], p[1]); const o = cell(k.c, k.r);
+    // dive straight INTO the tapped point — no recentre-pan, which lags on
+    // mobile's lower frame rate and desyncs which cover you actually land on.
+    diveActive = true; zoomC = [p[0] / W(), 1 - p[1] / H()]; cap.style.opacity = 0;
     flashEl.classList.remove('go'); void flashEl.offsetWidth;
     setTimeout(() => flashEl.classList.add('go'), 520);
     // unlock the page BEFORE the handoff — diveToProject scrollTo()s to the
@@ -182,7 +187,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
   container.addEventListener('touchmove', e => { if (diveActive) return; e.preventDefault();   // don't let the page scroll under the bed
     const t = e.touches[0];
     const dx = t.clientX - tx, dy = t.clientY - ty; ox += dx; oy += dy; tmoved += Math.abs(dx) + Math.abs(dy); tx = t.clientX; ty = t.clientY; hoverPt = [t.clientX, t.clientY]; }, { passive: false });
-  container.addEventListener('touchend', e => { if (touching && tmoved < 8 && !diveActive) { hoverPt = [tx, ty]; enter(); } touching = false; });
+  container.addEventListener('touchend', e => { if (touching && tmoved < 8 && !diveActive) { e.preventDefault(); hoverPt = [tx, ty]; enter(); } touching = false; }, { passive: false });
   addEventListener('resize', () => { if (running) { const dpr = Math.min(COARSE ? 1.25 : 2, devicePixelRatio || 1); cv.width = W() * dpr; cv.height = H() * dpr; makeFBO(); } });
 
   function open(startGlobal) {

@@ -561,6 +561,7 @@ function mountCase(i) {
   relayoutCase();            // ensure heights/tops current for this VW
   const cyc = caseTrack.trackH;
   spacer.style.height = (CASE_LOOPS * cyc) + 'px';
+  void spacer.offsetHeight;   // force reflow so the page is actually scrollable to y (mobile)
   // top-align project i's first image to the viewport top, then scroll down through it
   const startTop = caseTrack.tops[t.starts[i]];
   const y = Math.floor(CASE_LOOPS / 2) * cyc + startTop + VH / 2;
