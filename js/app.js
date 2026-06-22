@@ -232,31 +232,40 @@ function makeSlideMaterial(texture) {
   });
 }
 
-function buildCaseTrack() {
-  if (caseTrack) return caseTrack;
-  const items = [];
-  const starts = [];
-
-  PROJECTS.forEach((project, i) => {
-    starts.push(items.length);
-    const sources = (project.images && project.images.length)
-      ? project.images
-      : makeGallery(i, project);
-
-    sources.forEach((src) => {
-      const isUrl = typeof src === 'string';
-      const mat = makeSlideMaterial(isUrl ? BLACK_TEX : src);
-      const mesh = new THREE.Mesh(planeGeo, mat);
-      mesh.visible = false;
-      sceneA.add(mesh);
-      const item = { mesh, mat, imgW: 1080, imgH: 1440 };
-      item.fit = relayoutCase;   // any image load re-flows the whole track
-      if (isUrl) loadMedia(src, item);
-      items.push(item);
-    });
+// each project is its OWN self-contained track now — diving builds only that
+// project's images. A clean deep dive (no scrolling through the others) and far
+// less to load on mobile. The previous project's GPU resources are freed.
+function disposeCaseTrack() {
+  if (!caseTrack) return;
+  caseTrack.items.forEach((it) => {
+    sceneA.remove(it.mesh);
+    if (it.video) { it.video.pause(); it.video.removeAttribute('src'); }
+    const tex = it.mat.uniforms.map.value;
+    if (tex && tex !== BLACK_TEX && tex.dispose) tex.dispose();
+    it.mat.dispose();
   });
+  caseTrack = null;
+}
 
-  caseTrack = { items, starts, N: items.length, heights: [], tops: [], trackH: 0 };
+function buildCaseTrack(only) {
+  disposeCaseTrack();
+  const project = PROJECTS[only];
+  const sources = (project.images && project.images.length)
+    ? project.images
+    : makeGallery(only, project);
+  const items = [];
+  sources.forEach((src) => {
+    const isUrl = typeof src === 'string';
+    const mat = makeSlideMaterial(isUrl ? BLACK_TEX : src);
+    const mesh = new THREE.Mesh(planeGeo, mat);
+    mesh.visible = false;
+    sceneA.add(mesh);
+    const item = { mesh, mat, imgW: 1080, imgH: 1440 };
+    item.fit = relayoutCase;   // an image load re-flows this project's track
+    if (isUrl) loadMedia(src, item);
+    items.push(item);
+  });
+  caseTrack = { items, proj: only, N: items.length, heights: [], tops: [], trackH: 0 };
   window.__caseTrack = caseTrack;
   relayoutCase();
   return caseTrack;
@@ -288,13 +297,6 @@ function relayoutCase() {
   if (detailOpen) spacer.style.height = (CASE_LOOPS * acc) + 'px';
 }
 
-// which project owns case-track item k
-function projOfItem(k) {
-  const s = caseTrack.starts;
-  let p = 0;
-  for (let i = 0; i < s.length; i++) if (k >= s[i]) p = i;
-  return p;
-}
 
 /* ── effect manager ────────────────────────────────────────────────── */
 const lensQuad = new THREE.Mesh(planeGeo);
@@ -551,7 +553,7 @@ function mountCase(i) {
   populateCard(i);
   detailEl.hidden = false;
 
-  const t = buildCaseTrack();
+  const t = buildCaseTrack(i);   // just this project's images
   slides.forEach(s => s.mesh.visible = false);
   t.items.forEach(it => {
     it.mesh.visible = true;
@@ -559,12 +561,11 @@ function mountCase(i) {
   });
 
   relayoutCase();            // ensure heights/tops current for this VW
-  const cyc = caseTrack.trackH;
+  const cyc = caseTrack.trackH || VH;
   spacer.style.height = (CASE_LOOPS * cyc) + 'px';
   void spacer.offsetHeight;   // force reflow so the page is actually scrollable to y (mobile)
-  // top-align project i's first image to the viewport top, then scroll down through it
-  const startTop = caseTrack.tops[t.starts[i]];
-  const y = Math.floor(CASE_LOOPS / 2) * cyc + startTop + VH / 2;
+  // start at the project's first image, top-aligned
+  const y = Math.floor(CASE_LOOPS / 2) * cyc + VH / 2;
   window.scrollTo(0, y);
   smooth = y; lastSmooth = y; scrollDif = 0;
   prevY = y; userVel = 0;   // no smear flash from the position jump
@@ -579,27 +580,11 @@ function mountCase(i) {
   stopAuto(true);
 }
 
-// jump STRAIGHT to project i in the case track (no glide-through) — used
-// under a fade so you teleport between projects instead of zooming past
-// every one in between.
-function jumpToProject(i) {
-  const cyc = caseTrack.trackH;
-  const startTop = caseTrack.tops[caseTrack.starts[i]];
-  const y = Math.floor(CASE_LOOPS / 2) * cyc + startTop + VH / 2;
-  window.scrollTo(0, y);
-  smooth = y; lastSmooth = y; scrollDif = 0; prevY = y; userVel = 0;
-  detailIdx = i; populateCard(i);
-}
-
 function openProject(i) {
   if (transitioning) return;
   if (detailOpen && i === detailIdx) return;
   stopAuto(false);
-  if (detailOpen) {
-    fadeSwap(() => { jumpToProject(i); stopAuto(true); }, 200, 600);  // fade-jump
-  } else {
-    fadeSwap(() => mountCase(i));
-  }
+  fadeSwap(() => mountCase(i));   // mountCase rebuilds the project's own track
 }
 
 // the dive: emerge INTO the project THROUGH the lens (no black cut). the
@@ -608,7 +593,7 @@ function openProject(i) {
 function diveToProject(i) {
   if (transitioning) return;
   transitioning = true;
-  if (detailOpen) jumpToProject(i); else mountCase(i);
+  mountCase(i);                      // self-contained per-project track
   delete tweens.displacement;
   state.displacement = 1;            // start deep inside the lens
   ui.lens = true; lensBtn.textContent = 'Lens: on';
@@ -626,10 +611,7 @@ function closeDetail() {
     detailIdx = -1;
     detailEl.hidden = true;
 
-    caseTrack.items.forEach(it => {
-      it.mesh.visible = false;
-      if (it.video) it.video.pause();
-    });
+    disposeCaseTrack();
     slides.forEach(s => s.mesh.visible = true);
     spacer.style.height = (LOOPS * cycleH()) + 'px';
     window.scrollTo(0, homeY);
@@ -793,8 +775,8 @@ function frame(now) {
 
   const ms = now - start;
   if (detailOpen && caseTrack) {
-    // looping case track — projects bleed into one another
-    const cyc = caseTrack.trackH;
+    // one self-contained project — its images loop within their own height
+    const cyc = caseTrack.trackH || VH;
     const pos = ((smooth % cyc) + cyc) % cyc;
     caseTrack.items.forEach((it, k) => {
       const center = caseTrack.tops[k] + caseTrack.heights[k] / 2;
@@ -803,19 +785,9 @@ function frame(now) {
       it.mesh.position.y = -d;
       it.mat.uniforms.time.value = ms;
       it.mat.uniforms.uVel.value = vel;
-      it.mat.uniforms.uBend.value = 0; // sub-pages present work flat — no bow
+      it.mat.uniforms.uBend.value = 0;
     });
-
-    // live project derivation — whichever item sits at viewport centre
-    let cur = 0;
-    for (let k = 0; k < caseTrack.items.length; k++) {
-      if (pos >= caseTrack.tops[k]) cur = k;
-    }
-    const pr = projOfItem(cur);
-    if (pr !== detailIdx) {
-      detailIdx = pr;
-      populateCard(pr);
-    }
+    // detailIdx is fixed = caseTrack.proj (single project) — no derivation
   } else {
     const cyc = cycleH();
     const pos = ((smooth % cyc) + cyc) % cyc;

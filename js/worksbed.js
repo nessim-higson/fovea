@@ -30,10 +30,7 @@ void main(){
   float lum1=dot(texture2D(uTex,n+0.5).rgb,vec3(0.3333));
   n.y*=1.0 - sin(uTime*0.001+uv.x*SF+lum1*SF)*uScrollDif*0.01*SA;
   n+=0.5;
-  vec3 col=texture2D(uTex,n).rgb;
-  float r=length(vUv-0.5);
-  col*=1.0-0.34*smoothstep(0.55,1.18,r);
-  gl_FragColor=vec4(col,1.0);
+  gl_FragColor=vec4(texture2D(uTex,n).rgb,1.0);   // no vignette/diffusion — crisp bed
 }`;
 
 export function initWorksBed({ container, projects, onEnter, isPlaying }) {
@@ -98,8 +95,10 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
   const CATS = [...new Set(projects.map(p => p.category || 'Work'))];
   let activeCat = CATS[0];
   let list = [], ox = 0, oy = 0, pox = 0, poy = 0, vel = 0, t0 = 0, running = false;
-  let zoom = 0, zoomTarget = 0, zoomC = [0.5, 0.5], diveActive = false, panTX = 0, panTY = 0;
+  let zoom = 0, zoomTarget = 0, zoomC = [0.5, 0.5], diveActive = false;
+  let panFromX = 0, panFromY = 0, panToX = 0, panToY = 0, diveT0 = 0;
   let hoverPt = null, lastFocus = '';
+  const smoothstep = t => t * t * (3 - 2 * t);
   const W = () => innerWidth, H = () => innerHeight;
 
   function buildToggle() {
@@ -134,8 +133,16 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     if (!running) return;
     const dpr = Math.min(COARSE ? 1.25 : 2, devicePixelRatio || 1);
     if (cv.width !== W() * dpr) { cv.width = W() * dpr; cv.height = H() * dpr; makeFBO(); }
-    if (!diveActive && Math.abs(zoom) < 0.03 && zoomTarget === 0 && (isPlaying ? isPlaying() : true)) { ox += 0.22; oy += 0.16; }
-    zoom += ((diveActive ? 1 : zoomTarget) - zoom) * 0.1;
+    if (diveActive) {
+      const e = (now || performance.now()) - diveT0;
+      const tf = smoothstep(Math.min(1, e / 240));                       // focus: slide the tile to centre
+      ox = panFromX + (panToX - panFromX) * tf;
+      oy = panFromY + (panToY - panFromY) * tf;
+      zoom = smoothstep(Math.min(1, Math.max(0, (e - 200) / 460)));       // then zoom into the centred tile
+    } else {
+      if (Math.abs(zoom) < 0.03 && zoomTarget === 0 && (isPlaying ? isPlaying() : true)) { ox += 0.22; oy += 0.16; }
+      zoom += (zoomTarget - zoom) * 0.1;
+    }
     vel = Math.min(46, Math.hypot(ox - pox, oy - poy) * 1.3); pox = ox; poy = oy;
     const fc = diveActive ? null : focusCell();
     if (fc) { const k = fc.c + ',' + fc.r; if (k !== lastFocus) { lastFocus = k; const o = cell(fc.c, fc.r);
@@ -149,7 +156,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
       const o = cell(c, r), px = c * TW + ox + GAP / 2, py = r * TH + oy + GAP / 2;
       gl.uniform4fv(gRect, clip(px, py, TW - GAP, TH - GAP)); gl.uniform2fv(gCov, cov(o.t.asp));
-      gl.uniform1f(gB, (fc && c === fc.c && r === fc.r) ? 1.22 : 0.82);
+      gl.uniform1f(gB, (fc && c === fc.c && r === fc.r) ? 1.12 : 1.0);   // crisp, full-brightness tiles
       gl.bindTexture(gl.TEXTURE_2D, o.t.tex); gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, cv.width, cv.height);
@@ -166,15 +173,17 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     if (diveActive) return;
     const p = hoverPt || [W() / 2, H() / 2];
     const k = cellAt(p[0], p[1]); const o = cell(k.c, k.r);
-    // dive straight INTO the tapped point — no recentre-pan, which lags on
-    // mobile's lower frame rate and desyncs which cover you actually land on.
-    diveActive = true; zoomC = [p[0] / W(), 1 - p[1] / H()]; cap.style.opacity = 0;
+    // focus → zoom: first slide the tapped tile to the centre (time-based, so it
+    // can't lag on mobile), THEN zoom straight into the centred tile.
+    panFromX = ox; panFromY = oy;
+    panToX = W() / 2 - (k.c + 0.5) * TW; panToY = H() / 2 - (k.r + 0.5) * TH;
+    diveActive = true; diveT0 = performance.now(); zoomC = [0.5, 0.5]; cap.style.opacity = 0;
     flashEl.classList.remove('go'); void flashEl.offsetWidth;
-    setTimeout(() => flashEl.classList.add('go'), 520);
+    setTimeout(() => flashEl.classList.add('go'), 620);
     // unlock the page BEFORE the handoff — diveToProject scrollTo()s to the
     // project's spot, and that's clamped to 0 while body.overflow is hidden
     // (which made the engine then scroll back through every project).
-    setTimeout(() => { document.body.style.overflow = ''; onEnter(o.gi); close(true); }, 560);
+    setTimeout(() => { document.body.style.overflow = ''; onEnter(o.gi); close(true); }, 660);
   }
 
   // input — scroll / swipe to move, click / tap to enter
