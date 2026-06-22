@@ -15,6 +15,7 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
+import { initOrbital } from './orbital.js';
 
 // content sets: ?set=<name> loads js/config-<name>.js (e.g. ?set=uniqlock)
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
@@ -25,8 +26,6 @@ const { SITE, PROJECTS, SETTINGS } = await import(
 /* ── DOM ───────────────────────────────────────────────────────────── */
 const lensBtn  = document.getElementById('lens-btn');
 const spacer   = document.getElementById('spacer');
-const railEl   = document.getElementById('rail');
-const catTabsEl = document.getElementById('cat-tabs');
 const detailEl = document.getElementById('detail');
 const detailX  = document.getElementById('detail-x');
 const metaEl   = document.getElementById('detail-meta');
@@ -500,45 +499,19 @@ soundBtn.addEventListener('click', () => {
   soundBtn.classList.toggle('on', on);
 });
 
-/* ── category tabs + live rail nav ─────────────────────────────────── */
-// categories drive the tabs (e.g. Commercial / Personal); the rail lists
-// the active category's projects and highlights where you are.
-const CATS = [...new Set(PROJECTS.map(p => p.category || 'Work'))];
-let activeCat = CATS[0];
-const railBtns = [];
-
-function renderRail() {
-  railEl.innerHTML = '';
-  railBtns.length = 0;
-  PROJECTS.forEach((p, i) => {
-    if ((p.category || 'Work') !== activeCat) return;
-    const b = document.createElement('button');
-    b.textContent = p.client;
-    b.dataset.idx = i;
-    b.addEventListener('click', () => openProject(i));
-    railEl.appendChild(b);
-    railBtns.push(b);
-  });
-}
-
-function renderTabs() {
-  catTabsEl.innerHTML = '';
-  if (CATS.length < 2) return;   // single-category sets get no tabs
-  CATS.forEach(cat => {
-    const b = document.createElement('button');
-    b.textContent = cat;
-    b.classList.toggle('active', cat === activeCat);
-    b.addEventListener('click', () => {
-      if (cat === activeCat) return;
-      activeCat = cat; renderTabs(); renderRail();
-      const first = PROJECTS.findIndex(p => (p.category || 'Work') === cat);
-      if (first >= 0) openProject(first);     // jump to the category's first project
-    });
-    catTabsEl.appendChild(b);
-  });
-}
-renderTabs();
-renderRail();
+/* ── secondary nav: the summon-able orbital index ──────────────────── */
+// the primary lens-scroll site is untouched; INDEX opens a lens-distorted
+// wheel of projects (js/orbital.js). Picking one dives into it.
+const orbital = initOrbital({
+  container: document.getElementById('orbital-nav'),
+  projects: PROJECTS,
+  onEnter: (i) => openProject(i),
+  isPlaying: () => !metroPaused,        // the square's tempo conducts it too
+});
+document.getElementById('index-btn').addEventListener('click', () => {
+  if (orbital.isOpen()) orbital.close();
+  else orbital.open(detailOpen ? detailIdx : currentIndex());
+});
 
 /* route transitions fade through black (the original site's pattern):
    fade out → swap the world while invisible → fade back in. */
@@ -644,23 +617,13 @@ function closeDetail() {
 
 detailX.addEventListener('click', closeDetail);
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && detailOpen) closeDetail();
+  if (e.key === 'Escape') {
+    if (orbital.isOpen()) orbital.close();
+    else if (detailOpen) closeDetail();
+  }
 });
 
-let lastNavIdx = -1;
-function updateNav() {
-  const idx = detailOpen ? detailIdx : currentIndex();
-  if (idx === lastNavIdx) return;
-  lastNavIdx = idx;
-  // inside a project, flip the active category to match where you've
-  // scrolled (Commercial→Personal boundary swaps the tab + rail). On the
-  // home loop, leave the category as the user set it.
-  if (detailOpen) {
-    const cat = PROJECTS[idx] ? (PROJECTS[idx].category || 'Work') : activeCat;
-    if (cat !== activeCat) { activeCat = cat; renderTabs(); renderRail(); }
-  }
-  railBtns.forEach(b => b.classList.toggle('active', +b.dataset.idx === idx));
-}
+function updateNav() { /* rail/tabs retired — the orbital index is the nav now */ }
 
 /* ── GUI panel ─────────────────────────────────────────────────────── */
 const gui = new GUI({ title: 'EFFECTS' });
