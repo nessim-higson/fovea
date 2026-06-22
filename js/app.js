@@ -15,7 +15,7 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initOrbital } from './orbital.js';
+import { initWorksBed } from './worksbed.js';
 
 // content sets: ?set=<name> loads js/config-<name>.js (e.g. ?set=uniqlock)
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
@@ -499,18 +499,18 @@ soundBtn.addEventListener('click', () => {
   soundBtn.classList.toggle('on', on);
 });
 
-/* ── secondary nav: the summon-able orbital index ──────────────────── */
-// the primary lens-scroll site is untouched; INDEX opens a lens-distorted
-// wheel of projects (js/orbital.js). Picking one dives into it.
-const orbital = initOrbital({
-  container: document.getElementById('orbital-nav'),
+/* ── global nav: the Works bed ─────────────────────────────────────── */
+// the primary lens-scroll stays the landing; Works zooms out to an infinite
+// lens-warped bed of every cover (js/worksbed.js). Click a cover to dive in.
+const worksBed = initWorksBed({
+  container: document.getElementById('works-bed'),
   projects: PROJECTS,
   onEnter: (i) => diveToProject(i),
-  isPlaying: () => !metroPaused,        // the square's tempo conducts it too
+  isPlaying: () => !metroPaused,        // the square's tempo conducts the drift
 });
-document.getElementById('index-btn').addEventListener('click', () => {
-  if (orbital.isOpen()) orbital.close();
-  else orbital.open(detailOpen ? detailIdx : currentIndex());
+document.getElementById('works-btn').addEventListener('click', () => {
+  if (worksBed.isOpen()) worksBed.close();
+  else worksBed.open(detailOpen ? detailIdx : currentIndex());
 });
 
 /* route transitions fade through black (the original site's pattern):
@@ -591,9 +591,9 @@ function openProject(i) {
   }
 }
 
-// the orbital's dive: emerge INTO the project THROUGH the lens (no black cut).
-// the project mounts fully lensed, then the tunnel resolves to flat — reads as
-// one continuous push-through from the orbital's pushing-in cover.
+// the dive: emerge INTO the project THROUGH the lens (no black cut). the
+// project mounts fully lensed, then the tunnel resolves to flat — reads as one
+// continuous push-through from the Works bed's zoom-into-cover.
 function diveToProject(i) {
   if (transitioning) return;
   transitioning = true;
@@ -633,12 +633,12 @@ function closeDetail() {
 detailX.addEventListener('click', closeDetail);
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    if (orbital.isOpen()) orbital.close();
+    if (worksBed.isOpen()) worksBed.close();
     else if (detailOpen) closeDetail();
   }
 });
 
-function updateNav() { /* rail/tabs retired — the orbital index is the nav now */ }
+function updateNav() { /* rail/tabs retired — the Works bed is the nav now */ }
 
 /* ── GUI panel ─────────────────────────────────────────────────────── */
 const gui = new GUI({ title: 'EFFECTS' });
