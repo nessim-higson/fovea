@@ -9,6 +9,7 @@ const isVid = u => /\.(mp4|m4v|webm|mov)$/i.test(u || '');
 const coverOf = p => (p.image && !isVid(p.image)) ? p.image : ((p.images || []).find(u => !isVid(u)) || p.image);
 
 const TW = 230, TH = 150, GAP = 10, DISP = 0.85;
+const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 const gridVS = `attribute vec2 aUV;uniform vec4 uRect;varying vec2 vUv;
 void main(){vUv=aUV;gl_Position=vec4(uRect.xy+aUV*uRect.zw,0.,1.);}`;
 const gridFS = `precision highp float;varying vec2 vUv;uniform sampler2D uTex;uniform vec2 uCov;uniform float uB;
@@ -70,8 +71,16 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([16, 16, 16, 255]));
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    const im = new Image(); im.onload = () => { gl.bindTexture(gl.TEXTURE_2D, t.tex); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, im); t.asp = im.naturalWidth / im.naturalHeight; };
+    const im = new Image(); im.crossOrigin = 'anonymous';
+    im.onload = () => {
+      // thumbnails only need ~640px — downscale before upload so the bed isn't
+      // holding 25 full-res (1800px) textures in GPU memory on a phone
+      const MAX = 640, nw = im.naturalWidth, nh = im.naturalHeight; let w = nw, h = nh;
+      if (Math.max(w, h) > MAX) { const s = MAX / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+      const cc = document.createElement('canvas'); cc.width = w; cc.height = h; cc.getContext('2d').drawImage(im, 0, 0, w, h);
+      gl.bindTexture(gl.TEXTURE_2D, t.tex); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cc); t.asp = nw / nh;
+    };
     im.src = url; texCache[url] = t; return t;
   }
   let fbo, fboTex;
@@ -119,7 +128,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
 
   function frame(now) {
     if (!running) return;
-    const dpr = Math.min(2, devicePixelRatio || 1);
+    const dpr = Math.min(COARSE ? 1.25 : 2, devicePixelRatio || 1);
     if (cv.width !== W() * dpr) { cv.width = W() * dpr; cv.height = H() * dpr; makeFBO(); }
     if (diveActive) { ox += (panTX - ox) * 0.12; oy += (panTY - oy) * 0.12; }
     else if (Math.abs(zoom) < 0.03 && zoomTarget === 0 && (isPlaying ? isPlaying() : true)) { ox += 0.22; oy += 0.16; }
@@ -167,23 +176,25 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
   container.addEventListener('click', e => { if (e.target.closest('.wb-toggle,.wb-close')) return; if (!diveActive) enter(); });
   let tx = 0, ty = 0, tmoved = 0, touching = false;
   container.addEventListener('touchstart', e => { const t = e.touches[0]; tx = t.clientX; ty = t.clientY; tmoved = 0; touching = true; hoverPt = [tx, ty]; }, { passive: true });
-  container.addEventListener('touchmove', e => { if (diveActive) return; const t = e.touches[0];
-    const dx = t.clientX - tx, dy = t.clientY - ty; ox += dx; oy += dy; tmoved += Math.abs(dx) + Math.abs(dy); tx = t.clientX; ty = t.clientY; hoverPt = [t.clientX, t.clientY]; }, { passive: true });
+  container.addEventListener('touchmove', e => { if (diveActive) return; e.preventDefault();   // don't let the page scroll under the bed
+    const t = e.touches[0];
+    const dx = t.clientX - tx, dy = t.clientY - ty; ox += dx; oy += dy; tmoved += Math.abs(dx) + Math.abs(dy); tx = t.clientX; ty = t.clientY; hoverPt = [t.clientX, t.clientY]; }, { passive: false });
   container.addEventListener('touchend', e => { if (touching && tmoved < 8 && !diveActive) { hoverPt = [tx, ty]; enter(); } touching = false; });
-  addEventListener('resize', () => { if (running) { const dpr = Math.min(2, devicePixelRatio || 1); cv.width = W() * dpr; cv.height = H() * dpr; makeFBO(); } });
+  addEventListener('resize', () => { if (running) { const dpr = Math.min(COARSE ? 1.25 : 2, devicePixelRatio || 1); cv.width = W() * dpr; cv.height = H() * dpr; makeFBO(); } });
 
   function open(startGlobal) {
     if (startGlobal != null && projects[startGlobal]) activeCat = projects[startGlobal].category || 'Work';
-    container.hidden = false;
-    const dpr = Math.min(2, devicePixelRatio || 1); cv.width = W() * dpr; cv.height = H() * dpr; makeFBO();
+    container.hidden = false; document.body.style.overflow = 'hidden';   // freeze the page behind
+    const dpr = Math.min(COARSE ? 1.25 : 2, devicePixelRatio || 1); cv.width = W() * dpr; cv.height = H() * dpr; makeFBO();
     setCat(startGlobal);
     diveActive = false; zoomC = [0.5, 0.5]; zoom = 0.82; zoomTarget = 0;   // zoom OUT from the landing into the field
     if (!running) { running = true; t0 = performance.now(); requestAnimationFrame(frame); }
   }
+  function hide() { running = false; container.hidden = true; document.body.style.overflow = ''; zoom = 0; diveActive = false; }
   function close(immediate) {
-    if (immediate) { running = false; container.hidden = true; zoom = 0; zoomTarget = 0; diveActive = false; return; }
+    if (immediate) { zoomTarget = 0; hide(); return; }
     zoomTarget = 0.82;                         // zoom back IN toward the landing, then hide
-    setTimeout(() => { running = false; container.hidden = true; zoom = 0; diveActive = false; }, 360);
+    setTimeout(hide, 360);
   }
   return { open, close: () => close(false), isOpen: () => running };
 }

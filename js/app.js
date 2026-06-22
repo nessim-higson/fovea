@@ -17,11 +17,13 @@ import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
 import { initWorksBed } from './worksbed.js';
 
-// content sets: ?set=<name> loads js/config-<name>.js (e.g. ?set=uniqlock)
+// content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
+// portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config.js'
+  CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js'
 );
+const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
 /* ── DOM ───────────────────────────────────────────────────────────── */
 const lensBtn  = document.getElementById('lens-btn');
@@ -42,7 +44,7 @@ let detailIdx = -1;
 const renderer = new THREE.WebGLRenderer({
   canvas: document.getElementById('gl'), antialias: true,
 });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, COARSE ? 1.5 : 2));
 
 let VW = 0, VH = 0;   // set by layout() (which runs immediately below)
 
@@ -121,13 +123,21 @@ function loadMedia(src, holder) {
     });
     v.play().catch(() => {});
   } else {
-    new THREE.TextureLoader().setCrossOrigin('anonymous').load(src, (t) => {
+    // downscale on load — the source art is ~1800px; full-size textures
+    // exhaust GPU memory on phones. Cap the longest edge, keep the aspect.
+    const img = new Image(); img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const MAX = COARSE ? 1100 : 1600, nw = img.naturalWidth, nh = img.naturalHeight;
+      let w = nw, h = nh;
+      if (Math.max(w, h) > MAX) { const s = MAX / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      const t = new THREE.CanvasTexture(c);
       t.colorSpace = THREE.SRGBColorSpace;
       holder.mat.uniforms.map.value = t;
-      holder.imgW = t.image.naturalWidth;
-      holder.imgH = t.image.naturalHeight;
-      holder.fit();
-    });
+      holder.imgW = nw; holder.imgH = nh; holder.fit();
+    };
+    img.src = src;
   }
 }
 
@@ -602,7 +612,7 @@ function diveToProject(i) {
   state.displacement = 1;            // start deep inside the lens
   ui.lens = true; lensBtn.textContent = 'Lens: on';
   tween('displacement', 0, 1000);    // ...then the tunnel opens out to flat
-  stopAuto(true);
+  stopAuto(false);                   // land on the picked project and HOLD — no auto scroll-away
   setTimeout(() => { transitioning = false; }, 1000);
 }
 
@@ -716,6 +726,9 @@ const start = performance.now();
 let lastNow = start;
 let lastBeatPhase = 0, beatStepRemaining = 0;
 function frame(now) {
+  // while the Works bed owns the screen, skip the main render entirely — no
+  // point driving two WebGL contexts at once (a big win on mobile)
+  if (worksBed.isOpen()) { lastNow = now; requestAnimationFrame(frame); return; }
   const dt = Math.min(now - lastNow, 100); // clamp tab-switch gaps
   lastNow = now;
 
