@@ -505,7 +505,7 @@ soundBtn.addEventListener('click', () => {
 const orbital = initOrbital({
   container: document.getElementById('orbital-nav'),
   projects: PROJECTS,
-  onEnter: (i) => openProject(i),
+  onEnter: (i) => diveToProject(i),
   isPlaying: () => !metroPaused,        // the square's tempo conducts it too
 });
 document.getElementById('index-btn').addEventListener('click', () => {
@@ -589,6 +589,21 @@ function openProject(i) {
   } else {
     fadeSwap(() => mountCase(i));
   }
+}
+
+// the orbital's dive: emerge INTO the project THROUGH the lens (no black cut).
+// the project mounts fully lensed, then the tunnel resolves to flat — reads as
+// one continuous push-through from the orbital's pushing-in cover.
+function diveToProject(i) {
+  if (transitioning) return;
+  transitioning = true;
+  if (detailOpen) jumpToProject(i); else mountCase(i);
+  delete tweens.displacement;
+  state.displacement = 1;            // start deep inside the lens
+  ui.lens = true; lensBtn.textContent = 'Lens: on';
+  tween('displacement', 0, 1000);    // ...then the tunnel opens out to flat
+  stopAuto(true);
+  setTimeout(() => { transitioning = false; }, 1000);
 }
 
 function closeDetail() {

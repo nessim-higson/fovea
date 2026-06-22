@@ -214,14 +214,15 @@ body::-webkit-scrollbar { display: none; }
 .orb-ring { position: absolute; inset: 0; z-index: 5; }
 .orb-item {
   position: absolute; left: 0; top: 0; white-space: nowrap; cursor: pointer;
-  font-family: "Fraunces", Georgia, serif; color: #fff; text-transform: uppercase; line-height: 1;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #fff;
+  text-transform: uppercase; line-height: 1;
   transform: translate(-50%,-50%);
   will-change: transform, opacity, font-size, filter, text-shadow;
 }
 .orb-meta {
   position: absolute; left: 50%; bottom: 8.5vh; transform: translateX(-50%); z-index: 6;
-  font-family: "Fraunces", Georgia, serif; font-style: italic; font-weight: 400;
-  font-size: 15px; letter-spacing: 0.04em; color: rgba(255,255,255,0.82);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 400;
+  font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.7);
   transition: opacity .5s ease; text-shadow: 0 2px 16px rgba(0,0,0,0.6);
 }
 .orb-enter {
