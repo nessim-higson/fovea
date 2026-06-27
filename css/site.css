@@ -200,6 +200,19 @@ body::-webkit-scrollbar { display: none; }
 }
 .index-btn:hover { background: rgba(255,255,255,0.15); }
 
+/* View — dive into the project currently in view, straight from the landing */
+.view-btn {
+  position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
+  padding: 9px 20px;
+  text-transform: uppercase; letter-spacing: 0.14em;
+  background: rgba(255,255,255,0.92); color: #000;
+  border: 0; font: inherit; border-radius: 999px; cursor: pointer;
+  box-shadow: 0 6px 26px rgba(0,0,0,0.4);
+  transition: transform 140ms, background 140ms;
+}
+.view-btn[hidden] { display: none; }
+.view-btn:hover { transform: translateX(-50%) translateY(-1px); }
+
 /* ═══ WORKS BED — global nav overlay (built by js/worksbed.js) ═══ */
 .works-bed { position: fixed; inset: 0; z-index: 30; background: #000; }
 .works-bed[hidden] { display: none; }
@@ -221,10 +234,13 @@ body::-webkit-scrollbar { display: none; }
   text-transform: uppercase; color: rgba(255,255,255,0.4); text-align: right;
 }
 .wb-close {
-  position: absolute; left: 20px; top: 20px; z-index: 10; width: 34px; height: 34px; border-radius: 50%;
-  background: rgba(255,255,255,0.12); border: 0; color: #fff; font: inherit; font-size: 15px; cursor: pointer;
+  position: absolute; left: 20px; top: 20px; z-index: 10;
+  padding: 8px 15px; border-radius: 999px;
+  background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.28);
+  color: #fff; font: inherit; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
-.wb-close:hover { background: rgba(255,255,255,0.24); }
+.wb-close:hover { background: rgba(255,255,255,0.18); }
 .wb-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 20; }
 .wb-flash.go { animation: wbFlash .55s ease; }
 @keyframes wbFlash { 0% { opacity: 0.72; } 100% { opacity: 0; } }

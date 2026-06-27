@@ -86,6 +86,7 @@ const imageFrag = /* glsl */`
   uniform float time;
   uniform float detailMode;   // 1 = full image, 0 = luminance-grain ghost
   uniform float opacity;
+  uniform float uLift;        // exposure lift (project images > 1 so they pop)
 
   float hash(vec2 p) {
     return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453123);
@@ -97,6 +98,7 @@ const imageFrag = /* glsl */`
     float avg = (outColor.r + outColor.g + outColor.b) / 3.0;
     outColor.rgb = outColor.rgb * detailMode
                  + vec3((1.0 - detailMode) * avg * (grain * 5.5 * (1.0 - avg)));
+    outColor.rgb *= uLift;
     gl_FragColor = vec4(outColor.rgb, outColor.a * opacity);
   }
 `;
@@ -160,6 +162,7 @@ const slides = PROJECTS.map((p, i) => {
       opacity:    { value: 1 },
       uVel:       { value: 0 },
       uBend:      { value: SETTINGS.trackBend },
+      uLift:      { value: 1 },
     },
   });
   const mesh = new THREE.Mesh(planeGeo, mat);
@@ -216,6 +219,7 @@ function fitContain(item) {
 */
 let caseTrack = null;   // { items, starts, N }
 const CASE_LOOPS = 4;
+const DETAIL_LIFT = 1.22;   // exposure lift for in-project images (they read dark otherwise)
 
 function makeSlideMaterial(texture) {
   return new THREE.ShaderMaterial({
@@ -228,6 +232,7 @@ function makeSlideMaterial(texture) {
       opacity:    { value: 1 },
       uVel:       { value: 0 },
       uBend:      { value: SETTINGS.trackBend },
+      uLift:      { value: DETAIL_LIFT },   // project images are lifted so they pop
     },
   });
 }
@@ -525,6 +530,15 @@ document.getElementById('works-btn').addEventListener('click', () => {
   else worksBed.open(detailOpen ? detailIdx : currentIndex());
 });
 
+// dive into the project currently in view, straight from the landing
+const viewBtn = document.getElementById('view-btn');
+function diveFromLanding() {
+  if (transitioning || detailOpen || worksBed.isOpen()) return;
+  diveToProject(currentIndex());
+}
+viewBtn.addEventListener('click', diveFromLanding);
+document.getElementById('gl').addEventListener('click', diveFromLanding);   // tap the cover too
+
 /* route transitions fade through black (the original site's pattern):
    fade out → swap the world while invisible → fade back in. */
 let transitioning = false;
@@ -631,7 +645,16 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-function updateNav() { /* rail/tabs retired — the Works bed is the nav now */ }
+let lastViewIdx = -2;
+function updateNav() {
+  // the View button names the cover currently in view, on the landing only
+  const onHome = !detailOpen && !worksBed.isOpen() && !transitioning;
+  viewBtn.hidden = !onHome;
+  if (onHome) {
+    const i = currentIndex();
+    if (i !== lastViewIdx) { lastViewIdx = i; viewBtn.textContent = `View ${PROJECTS[i].client} ↗`; }
+  } else { lastViewIdx = -2; }
+}
 
 /* ── GUI panel ─────────────────────────────────────────────────────── */
 const gui = new GUI({ title: 'EFFECTS' });

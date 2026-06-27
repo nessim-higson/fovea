@@ -39,7 +39,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     '<div class="wb-cap"></div>' +
     '<div class="wb-toggle"></div>' +
     '<div class="wb-hint">scroll / swipe to move · click to enter · esc to close</div>' +
-    '<button class="wb-close" aria-label="Close works">&#10005;</button>' +
+    '<button class="wb-close" aria-label="Back to the landing">&#10005;&nbsp;Close</button>' +
     '<div class="wb-flash"></div>';
   const cv = container.querySelector('.wb-gl');
   const cap = container.querySelector('.wb-cap');
