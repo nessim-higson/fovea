@@ -178,12 +178,17 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     panFromX = ox; panFromY = oy;
     panToX = W() / 2 - (k.c + 0.5) * TW; panToY = H() / 2 - (k.r + 0.5) * TH;
     diveActive = true; diveT0 = performance.now(); zoomC = [0.5, 0.5]; cap.style.opacity = 0;
-    flashEl.classList.remove('go'); void flashEl.offsetWidth;
-    setTimeout(() => flashEl.classList.add('go'), 620);
-    // unlock the page BEFORE the handoff — diveToProject scrollTo()s to the
-    // project's spot, and that's clamped to 0 while body.overflow is hidden
-    // (which made the engine then scroll back through every project).
-    setTimeout(() => { document.body.style.overflow = ''; onEnter(o.gi); close(true); }, 660);
+    // hand off near the peak of the zoom, then CROSSFADE the bed out — both the
+    // bed (zoomed deep into the cover) and the project (mounting fully lensed on
+    // the same cover) look near-identical, so the renderer swap is invisible. No
+    // hard cut, no flash. (overflow unlocked first — see the V.22 scrollTo fix.)
+    setTimeout(() => {
+      document.body.style.overflow = '';
+      onEnter(o.gi);                                   // project mounts underneath, lensed
+      container.style.transition = 'opacity .34s ease';
+      container.style.opacity = '0';                   // fade the bed out, revealing the project
+      setTimeout(hide, 360);
+    }, 560);
   }
 
   // input — scroll / swipe to move, click / tap to enter
@@ -202,15 +207,23 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
   function open(startGlobal) {
     if (startGlobal != null && projects[startGlobal]) activeCat = projects[startGlobal].category || 'Work';
     container.hidden = false; document.body.style.overflow = 'hidden';   // freeze the page behind
+    container.style.transition = 'none'; container.style.opacity = '0';  // start invisible, fade in over the project
     const dpr = Math.min(COARSE ? 1.25 : 2, devicePixelRatio || 1); cv.width = W() * dpr; cv.height = H() * dpr; makeFBO();
     setCat(startGlobal);
-    diveActive = false; zoomC = [0.5, 0.5]; zoom = 0.82; zoomTarget = 0;   // zoom OUT from the landing into the field
+    diveActive = false; zoomC = [0.5, 0.5]; zoom = 0.82; zoomTarget = 0;   // zoom OUT from the cover into the field
     if (!running) { running = true; t0 = performance.now(); requestAnimationFrame(frame); }
+    requestAnimationFrame(() => { container.style.transition = 'opacity .3s ease'; container.style.opacity = '1'; });
   }
-  function hide() { running = false; container.hidden = true; document.body.style.overflow = ''; zoom = 0; diveActive = false; }
+  function hide() {
+    running = false; container.hidden = true; document.body.style.overflow = '';
+    container.style.transition = ''; container.style.opacity = '';
+    zoom = 0; zoomTarget = 0; diveActive = false;
+  }
   function close(immediate) {
-    if (immediate) { zoomTarget = 0; hide(); return; }
-    zoomTarget = 0.82;                         // zoom back IN toward the landing, then hide
+    if (immediate) { hide(); return; }
+    zoomTarget = 0.82;                                  // ease back toward the cover...
+    container.style.transition = 'opacity .34s ease';
+    container.style.opacity = '0';                      // ...crossfading to reveal the landing
     setTimeout(hide, 360);
   }
   return { open, close: () => close(false), isOpen: () => running };
