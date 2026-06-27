@@ -211,8 +211,9 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     const dpr = Math.min(COARSE ? 1.25 : 2, devicePixelRatio || 1); cv.width = W() * dpr; cv.height = H() * dpr; makeFBO();
     setCat(startGlobal);
     diveActive = false; zoomC = [0.5, 0.5]; zoom = 0.82; zoomTarget = 0;   // zoom OUT from the cover into the field
+    void container.offsetWidth;   // commit opacity:0 so the fade-in actually runs (no rAF dependency)
+    container.style.transition = 'opacity .3s ease'; container.style.opacity = '1';
     if (!running) { running = true; t0 = performance.now(); requestAnimationFrame(frame); }
-    requestAnimationFrame(() => { container.style.transition = 'opacity .3s ease'; container.style.opacity = '1'; });
   }
   function hide() {
     running = false; container.hidden = true; document.body.style.overflow = '';
