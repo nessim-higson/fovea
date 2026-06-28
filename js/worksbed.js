@@ -8,7 +8,7 @@
 const isVid = u => /\.(mp4|m4v|webm|mov)$/i.test(u || '');
 const coverOf = p => (p.image && !isVid(p.image)) ? p.image : ((p.images || []).find(u => !isVid(u)) || p.image);
 
-const TW = 230, TH = 150, GAP = 10, DISP = 0.85;
+const TW = 230, TH = 150, GAP = 10, DISP = 0.42;   // gentle resting lens (was 0.85 — too much)
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 const gridVS = `attribute vec2 aUV;uniform vec4 uRect;varying vec2 vUv;
 void main(){vUv=aUV;gl_Position=vec4(uRect.xy+aUV*uRect.zw,0.,1.);}`;
@@ -108,10 +108,17 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
       b.onclick = () => { if (cat === activeCat) return; activeCat = cat; setCat(); }; toggleEl.appendChild(b); });
   }
   function setCat(centerGlobal) {
-    list = projects.map((p, gi) => ({ p, gi, t: getTex(coverOf(p)) })).filter(o => (o.p.category || 'Work') === activeCat);
+    // pool EVERY image across the category's projects (not just the cover) so the
+    // bed reads as a varied field, not 16 repeating covers. Lazy-loaded (only the
+    // tiles actually drawn pull a texture), so the pool can be large cheaply.
+    list = [];
+    projects.forEach((p, gi) => {
+      if ((p.category || 'Work') !== activeCat) return;
+      const imgs = (p.images && p.images.length ? p.images : [coverOf(p)]).filter(u => !isVid(u));
+      imgs.forEach(src => list.push({ p, gi, src }));
+    });
     buildToggle();
-    // centre the requested project (or the first)
-    let si = list.findIndex(o => o.gi === centerGlobal); if (si < 0) si = 0;
+    let si = list.findIndex(o => o.gi === centerGlobal); if (si < 0) si = 0;   // centre the project's first image
     ox = W() / 2 - (si + 0.5) * TW; oy = H() / 2 - 0.5 * TH;
   }
   function cell(c, r) { const N = list.length; return list[(((c + r * 7) % N) + N) % N]; }
@@ -154,10 +161,10 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     gl.enableVertexAttribArray(gA); gl.vertexAttribPointer(gA, 2, gl.FLOAT, false, 0, 0);
     const c0 = Math.floor(-ox / TW) - 1, c1 = Math.ceil((W() - ox) / TW) + 1, r0 = Math.floor(-oy / TH) - 1, r1 = Math.ceil((H() - oy) / TH) + 1;
     for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
-      const o = cell(c, r), px = c * TW + ox + GAP / 2, py = r * TH + oy + GAP / 2;
-      gl.uniform4fv(gRect, clip(px, py, TW - GAP, TH - GAP)); gl.uniform2fv(gCov, cov(o.t.asp));
+      const o = cell(c, r), t = getTex(o.src), px = c * TW + ox + GAP / 2, py = r * TH + oy + GAP / 2;
+      gl.uniform4fv(gRect, clip(px, py, TW - GAP, TH - GAP)); gl.uniform2fv(gCov, cov(t.asp));
       gl.uniform1f(gB, (fc && c === fc.c && r === fc.r) ? 1.12 : 1.0);   // crisp, full-brightness tiles
-      gl.bindTexture(gl.TEXTURE_2D, o.t.tex); gl.drawArrays(gl.TRIANGLES, 0, 6);
+      gl.bindTexture(gl.TEXTURE_2D, t.tex); gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, cv.width, cv.height);
     gl.useProgram(lens); gl.bindBuffer(gl.ARRAY_BUFFER, quad);
@@ -178,17 +185,11 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     panFromX = ox; panFromY = oy;
     panToX = W() / 2 - (k.c + 0.5) * TW; panToY = H() / 2 - (k.r + 0.5) * TH;
     diveActive = true; diveT0 = performance.now(); zoomC = [0.5, 0.5]; cap.style.opacity = 0;
-    // hand off near the peak of the zoom, then CROSSFADE the bed out — both the
-    // bed (zoomed deep into the cover) and the project (mounting fully lensed on
-    // the same cover) look near-identical, so the renderer swap is invisible. No
-    // hard cut, no flash. (overflow unlocked first — see the V.22 scrollTo fix.)
-    setTimeout(() => {
-      document.body.style.overflow = '';
-      onEnter(o.gi);                                   // project mounts underneath, lensed
-      container.style.transition = 'opacity .34s ease';
-      container.style.opacity = '0';                   // fade the bed out, revealing the project
-      setTimeout(hide, 360);
-    }, 560);
+    // hand off at the peak of the zoom: the project mounts fully lensed on the
+    // SAME cover the bed is zoomed deep into, so a clean cut (no crossfade ghost,
+    // no flash) reads as one continuous lens push-through. The project's lens then
+    // resolves to flat. (overflow unlocked first — see the V.22 scrollTo fix.)
+    setTimeout(() => { document.body.style.overflow = ''; onEnter(o.gi); hide(); }, 560);
   }
 
   // input — scroll / swipe to move, click / tap to enter
@@ -207,12 +208,9 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
   function open(startGlobal) {
     if (startGlobal != null && projects[startGlobal]) activeCat = projects[startGlobal].category || 'Work';
     container.hidden = false; document.body.style.overflow = 'hidden';   // freeze the page behind
-    container.style.transition = 'none'; container.style.opacity = '0';  // start invisible, fade in over the project
     const dpr = Math.min(COARSE ? 1.25 : 2, devicePixelRatio || 1); cv.width = W() * dpr; cv.height = H() * dpr; makeFBO();
     setCat(startGlobal);
     diveActive = false; zoomC = [0.5, 0.5]; zoom = 0.82; zoomTarget = 0;   // zoom OUT from the cover into the field
-    void container.offsetWidth;   // commit opacity:0 so the fade-in actually runs (no rAF dependency)
-    container.style.transition = 'opacity .3s ease'; container.style.opacity = '1';
     if (!running) { running = true; t0 = performance.now(); requestAnimationFrame(frame); }
   }
   function hide() {
@@ -222,9 +220,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
   }
   function close(immediate) {
     if (immediate) { hide(); return; }
-    zoomTarget = 0.82;                                  // ease back toward the cover...
-    container.style.transition = 'opacity .34s ease';
-    container.style.opacity = '0';                      // ...crossfading to reveal the landing
+    zoomTarget = 0.82;            // zoom back in toward the cover, then hide → reveals the landing
     setTimeout(hide, 360);
   }
   return { open, close: () => close(false), isOpen: () => running };
