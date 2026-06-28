@@ -8,7 +8,7 @@
 const isVid = u => /\.(mp4|m4v|webm|mov)$/i.test(u || '');
 const coverOf = p => (p.image && !isVid(p.image)) ? p.image : ((p.images || []).find(u => !isVid(u)) || p.image);
 
-const TW = 230, TH = 150, GAP = 10, DISP = 0.42;   // gentle resting lens (was 0.85 — too much)
+const TW = 230, TH = 150, GAP = 10, DISP = 0.85;   // full lens distortion (the smear, not this, was the "too much")
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 const gridVS = `attribute vec2 aUV;uniform vec4 uRect;varying vec2 vUv;
 void main(){vUv=aUV;gl_Position=vec4(uRect.xy+aUV*uRect.zw,0.,1.);}`;
@@ -27,9 +27,7 @@ void main(){
   vec2 n=uv-0.5;
   float baseScale=1.0+0.5*disp-(1.0-outCircle)*disp*0.5;
   n*=baseScale;
-  float lum1=dot(texture2D(uTex,n+0.5).rgb,vec3(0.3333));
-  n.y*=1.0 - sin(uTime*0.001+uv.x*SF+lum1*SF)*uScrollDif*0.01*SA;
-  n+=0.5;
+  n+=0.5;                                   // smear removed — radial lens only
   gl_FragColor=vec4(texture2D(uTex,n).rgb,1.0);   // no vignette/diffusion — crisp bed
 }`;
 

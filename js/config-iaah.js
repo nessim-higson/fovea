@@ -84,7 +84,7 @@ export const PROJECTS = [
 ];
 
 export const SETTINGS = {
-  effect: 'lens-tunnel', scrollLerp: 0.05, smoothLerp: 0.1, maxVelocity: 40,
+  effect: 'lens-tunnel', scrollLerp: 0.05, smoothLerp: 0.06, maxVelocity: 40,
   autoScroll: true, autoSpeed: 60, autoResume: 2, trackBend: 1.0,
   audioSrc: null, audioVolume: 0.5, audioWarp: 1.0,
   beat: false, bpm: 60, beatAmount: 1.0, beatSharp: 4.0, beatStep: 80,

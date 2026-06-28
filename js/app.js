@@ -15,13 +15,13 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=27';
+import { initWorksBed } from './worksbed.js?v=28';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=28'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -532,12 +532,14 @@ document.getElementById('works-btn').addEventListener('click', () => {
 
 // dive into the project currently in view, straight from the landing
 const viewBtn = document.getElementById('view-btn');
+const glEl = document.getElementById('gl');
+glEl.style.cursor = 'pointer';   // on the landing the cover is clickable — show it
 function diveFromLanding() {
   if (transitioning || detailOpen || worksBed.isOpen()) return;
   diveToProject(currentIndex());
 }
 viewBtn.addEventListener('click', diveFromLanding);
-document.getElementById('gl').addEventListener('click', diveFromLanding);   // tap the cover too
+glEl.addEventListener('click', diveFromLanding);   // tap the cover too
 
 /* route transitions fade through black (the original site's pattern):
    fade out → swap the world while invisible → fade back in. */
@@ -589,6 +591,7 @@ function mountCase(i) {
   state.displacement = 0;
   ui.lens = false;
   lensBtn.textContent = 'Lens: off';
+  glEl.style.cursor = 'default';    // inside a project the cover isn't a dive target
 
   // let the sub-page auto-play too, after a beat
   stopAuto(true);
@@ -612,7 +615,7 @@ function diveToProject(i) {
   state.displacement = 1;            // start deep inside the lens
   ui.lens = true; lensBtn.textContent = 'Lens: on';
   tween('displacement', 0, 1000);    // ...then the tunnel opens out to flat
-  stopAuto(false);                   // land on the picked project and HOLD — no auto scroll-away
+  stopAuto(true);                    // auto-play through the project's images (per-project loop, settles then drifts)
   setTimeout(() => { transitioning = false; }, 1000);
 }
 
@@ -627,6 +630,7 @@ function closeDetail() {
 
     disposeCaseTrack();
     slides.forEach(s => s.mesh.visible = true);
+    glEl.style.cursor = 'pointer';    // back on the landing — cover is clickable again
     spacer.style.height = (LOOPS * cycleH()) + 'px';
     window.scrollTo(0, homeY);
     smooth = homeY; lastSmooth = homeY; scrollDif = 0;
