@@ -58,7 +58,7 @@ export const PROJECTS = [
     image: 'content/iaah/alphabet-soup/00.jpg', images: ['content/iaah/alphabet-soup/00.jpg', 'content/iaah/alphabet-soup/01.jpg', 'content/iaah/alphabet-soup/02.jpg', 'content/iaah/alphabet-soup/03.jpg', 'content/iaah/alphabet-soup/04.jpg', 'content/iaah/alphabet-soup/05.jpg', 'content/iaah/alphabet-soup/06.jpg', 'content/iaah/alphabet-soup/07.jpg'],
     description: 'An ongoing typographic exploration meant to push the boundaries of textile, fashion, and typography.' },
   { client: 'BODY TYPE', title: 'AI', category: 'Personal', year: 2024,
-    image: 'content/iaah/body-type/00.jpg', images: ['content/iaah/body-type/00.jpg', 'content/iaah/body-type/01.jpg', 'content/iaah/body-type/02.jpg', 'content/iaah/body-type/03.jpg', 'content/iaah/body-type/04.jpg', 'content/iaah/body-type/05.jpg', 'content/iaah/body-type/06.jpg'],
+    image: 'content/iaah/body-type/00.jpg', images: ['content/iaah/body-type/clip.mp4', 'content/iaah/body-type/00.jpg', 'content/iaah/body-type/01.jpg', 'content/iaah/body-type/02.jpg', 'content/iaah/body-type/03.jpg', 'content/iaah/body-type/04.jpg', 'content/iaah/body-type/05.jpg', 'content/iaah/body-type/06.jpg'],
     description: 'An exploration and investigation to how typography and body come together.' },
   { client: 'IAAH REEL 2024', title: 'AI', category: 'Personal', year: 2024,
     image: 'content/iaah/iaah-reel-2024/00.jpg', images: ['content/iaah/iaah-reel-2024/00.jpg'],

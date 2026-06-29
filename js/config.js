@@ -13,7 +13,7 @@ export const SITE = {
 
 const IMG = (n) => `./content/uniqlock/img/${String(n).padStart(2, '0')}.jpg`;
 const range = (a, b) => Array.from({ length: b - a + 1 }, (_, k) => IMG(a + k));
-const REEL = './content/uniqlock/reel.mp4';
+const REEL = './content/uniqlock/reel.mp4?v=30';   // NEVVERLAND reel (cache-bust on file swap)
 
 export const PROJECTS = [
   { client: 'BEATCUT', title: 'Tempo Study', year: 2026,
