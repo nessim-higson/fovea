@@ -61,7 +61,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
   const texCache = {};
   function getTex(url) {
     if (texCache[url]) return texCache[url];
-    const t = { tex: gl.createTexture(), asp: 1.5 };
+    const t = { tex: gl.createTexture(), asp: 1.5, ready: false, fade: 0 };
     gl.bindTexture(gl.TEXTURE_2D, t.tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([16, 16, 16, 255]));
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -75,6 +75,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
       const cc = document.createElement('canvas'); cc.width = w; cc.height = h; cc.getContext('2d').drawImage(im, 0, 0, w, h);
       gl.bindTexture(gl.TEXTURE_2D, t.tex); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cc); t.asp = nw / nh;
+      t.ready = true;   // triggers the per-tile fade-in
     };
     im.src = url; texCache[url] = t; return t;
   }
@@ -113,7 +114,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     projects.forEach((p, gi) => {
       if ((p.category || 'Work') !== activeCat) return;
       const imgs = (p.images && p.images.length ? p.images : [coverOf(p)]).filter(u => !isVid(u));
-      imgs.forEach(src => list.push({ p, gi, src }));
+      imgs.forEach(src => list.push({ p, gi, src: src.replace(/\.jpg$/i, '_t.jpg') }));   // fast thumbnail
     });
     buildToggle();
     let si = list.findIndex(o => o.gi === centerGlobal); if (si < 0) si = 0;   // centre the project's first image
@@ -160,8 +161,9 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     const c0 = Math.floor(-ox / TW) - 1, c1 = Math.ceil((W() - ox) / TW) + 1, r0 = Math.floor(-oy / TH) - 1, r1 = Math.ceil((H() - oy) / TH) + 1;
     for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
       const o = cell(c, r), t = getTex(o.src), px = c * TW + ox + GAP / 2, py = r * TH + oy + GAP / 2;
+      if (t.ready && t.fade < 1) t.fade = Math.min(1, t.fade + 0.07);   // ease each tile in as it loads
       gl.uniform4fv(gRect, clip(px, py, TW - GAP, TH - GAP)); gl.uniform2fv(gCov, cov(t.asp));
-      gl.uniform1f(gB, (fc && c === fc.c && r === fc.r) ? 1.12 : 1.0);   // crisp, full-brightness tiles
+      gl.uniform1f(gB, ((fc && c === fc.c && r === fc.r) ? 1.12 : 1.0) * t.fade);
       gl.bindTexture(gl.TEXTURE_2D, t.tex); gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, cv.width, cv.height);
