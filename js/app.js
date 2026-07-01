@@ -15,13 +15,13 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=30';
+import { initWorksBed } from './worksbed.js?v=31';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=30'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=31'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -110,19 +110,38 @@ const imageFrag = /* glsl */`
 const VIDEO_RE = /\.(mp4|m4v|webm|mov)(\?.*)?$/i;
 function loadMedia(src, holder) {
   if (VIDEO_RE.test(src)) {
+    // poster still FIRST — the slot is never black, and it's the graceful
+    // fallback if the video can't play (autoplay block, decode, slow net).
+    const posterUrl = src.replace(/\.(mp4|m4v|webm|mov)(\?.*)?$/i, '.jpg');
+    const pImg = new Image(); pImg.crossOrigin = 'anonymous';
+    pImg.onload = () => {
+      if (holder._videoLive) return;
+      const pt = new THREE.CanvasTexture(pImg); pt.colorSpace = THREE.SRGBColorSpace;
+      holder.mat.uniforms.map.value = pt;
+      holder.imgW = pImg.naturalWidth; holder.imgH = pImg.naturalHeight; holder.fit();
+    };
+    pImg.src = posterUrl;
+
     const v = document.createElement('video');
     v.muted = true; v.loop = true; v.playsInline = true; v.autoplay = true;
+    v.setAttribute('muted', ''); v.setAttribute('playsinline', '');   // iOS inline autoplay
     v.crossOrigin = 'anonymous';
     v.src = src;
     holder.video = v;
-    v.addEventListener('loadedmetadata', () => {
+    // wait for a REAL frame (loadeddata, not just metadata) before texturing —
+    // uploading a frameless video is what throws / shows black.
+    v.addEventListener('loadeddata', () => {
+      holder._videoLive = true;
       holder.imgW = v.videoWidth || 16;
       holder.imgH = v.videoHeight || 9;
       const t = new THREE.VideoTexture(v);
       t.colorSpace = THREE.SRGBColorSpace;
       holder.mat.uniforms.map.value = t;
       holder.fit();
+      v.play().catch(() => {});
     });
+    v.addEventListener('canplay', () => v.play().catch(() => {}));
+    v.load();
     v.play().catch(() => {});
   } else {
     // downscale on load — the source art is ~1800px; full-size textures

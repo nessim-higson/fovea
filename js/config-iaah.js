@@ -61,7 +61,7 @@ export const PROJECTS = [
     image: 'content/iaah/body-type/00.jpg', images: ['content/iaah/body-type/clip.mp4', 'content/iaah/body-type/00.jpg', 'content/iaah/body-type/01.jpg', 'content/iaah/body-type/02.jpg', 'content/iaah/body-type/03.jpg', 'content/iaah/body-type/04.jpg', 'content/iaah/body-type/05.jpg', 'content/iaah/body-type/06.jpg'],
     description: 'An exploration and investigation to how typography and body come together.' },
   { client: 'IAAH REEL 2024', title: 'AI', category: 'Personal', year: 2024,
-    image: 'content/iaah/iaah-reel-2024/00.jpg', images: ['content/iaah/iaah-reel-2024/00.jpg'],
+    image: 'content/iaah/iaah-reel-2024/00.jpg', images: ['content/iaah/iaah-reel-2024/reel.mp4', 'content/iaah/iaah-reel-2024/00.jpg'],
     description: '' },
   { client: 'MOVEMENT', title: 'Design', category: 'Personal', year: 2023,
     image: 'content/iaah/movement/00.jpg', images: ['content/iaah/movement/00.jpg', 'content/iaah/movement/01.jpg', 'content/iaah/movement/02.jpg', 'content/iaah/movement/03.jpg', 'content/iaah/movement/04.jpg', 'content/iaah/movement/05.jpg', 'content/iaah/movement/06.jpg', 'content/iaah/movement/07.jpg'],
