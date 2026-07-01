@@ -116,6 +116,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
       const imgs = (p.images && p.images.length ? p.images : [coverOf(p)]).filter(u => !isVid(u));
       imgs.forEach(src => list.push({ p, gi, src: src.replace(/\.jpg$/i, '_t.jpg') }));   // fast thumbnail
     });
+    list.forEach(o => getTex(o.src));   // eager-prefetch all thumbs so the field fills immediately (they're tiny)
     buildToggle();
     let si = list.findIndex(o => o.gi === centerGlobal); if (si < 0) si = 0;   // centre the project's first image
     ox = W() / 2 - (si + 0.5) * TW; oy = H() / 2 - 0.5 * TH;
@@ -210,7 +211,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     container.hidden = false; document.body.style.overflow = 'hidden';   // freeze the page behind
     const dpr = Math.min(COARSE ? 1.25 : 2, devicePixelRatio || 1); cv.width = W() * dpr; cv.height = H() * dpr; makeFBO();
     setCat(startGlobal);
-    diveActive = false; zoomC = [0.5, 0.5]; zoom = 0.82; zoomTarget = 0;   // zoom OUT from the cover into the field
+    diveActive = false; zoomC = [0.5, 0.5]; zoom = 0.5; zoomTarget = 0;   // open showing a chunk of the field (not zoomed onto one tile)
     if (!running) { running = true; t0 = performance.now(); requestAnimationFrame(frame); }
   }
   function hide() {
