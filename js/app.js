@@ -15,13 +15,13 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=32';
+import { initWorksBed } from './worksbed.js?v=33';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=32'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=33'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -555,7 +555,18 @@ const glEl = document.getElementById('gl');
 glEl.style.cursor = 'pointer';   // on the landing the cover is clickable — show it
 function diveFromLanding() {
   if (transitioning || detailOpen || worksBed.isOpen()) return;
-  diveToProject(currentIndex());
+  const i = currentIndex();
+  stopAuto(false);
+  // symmetric with closing out: fade THROUGH BLACK (masks the scene swap so it
+  // feels fluid), and bloom the project out of the lens as it fades up.
+  fadeSwap(() => {
+    mountCase(i);
+    delete tweens.displacement;
+    state.displacement = 1;            // project starts fully lensed...
+    ui.lens = true; lensBtn.textContent = 'Lens: on';
+    tween('displacement', 0, 900);     // ...then the tunnel opens out to flat
+    stopAuto(true);
+  }, 220, 900);
 }
 viewBtn.addEventListener('click', diveFromLanding);
 glEl.addEventListener('click', diveFromLanding);   // tap the cover too
