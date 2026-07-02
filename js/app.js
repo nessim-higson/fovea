@@ -15,13 +15,13 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=34';
+import { initWorksBed } from './worksbed.js?v=35';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=34'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=35'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -483,6 +483,8 @@ const auto = { active: false, acc: 0, idleTimer: null };
    scroll movement (auto-drift + manual), so it spins steadily while the page
    auto-plays and quickly on a fast scroll. Clicking it pauses that motion. */
 const METRO_DEG_PER_PX = 0.6;
+const METRO_CASE_SCALE = 0.35;  // project pages cover big pixel distances — calmer rate
+const METRO_MAX_DPS = 300;      // hard °/s cap so a fast flick can't whip the square
 let metroDeg = 0, metroPaused = false;
 
 function startAuto() {
@@ -579,15 +581,17 @@ function diveFromLanding() {
   const i = currentIndex();
   stopAuto(false);
   // symmetric with closing out: fade THROUGH BLACK (masks the scene swap so it
-  // feels fluid), and bloom the project out of the lens as it fades up.
+  // feels fluid), and bloom the project out of the lens as it fades up. the
+  // resolve outlasts the fade (like the exit's 2s bloom) so the tunnel opens
+  // gently instead of snapping flat.
   fadeSwap(() => {
     mountCase(i);
     delete tweens.displacement;
     state.displacement = 1;            // project starts fully lensed...
     ui.lens = true; lensBtn.textContent = 'Lens: on';
-    tween('displacement', 0, 900);     // ...then the tunnel opens out to flat
+    tween('displacement', 0, 1800);    // ...then the tunnel opens out to flat
     stopAuto(true);
-  }, 220, 900);
+  }, 220, 1000);
 }
 viewBtn.addEventListener('click', diveFromLanding);
 glEl.addEventListener('click', diveFromLanding);   // tap the cover too
@@ -844,9 +848,14 @@ function frame(now) {
 
   // turn the IAAH square with the TOTAL motion (auto-drift + manual scroll).
   // (autoWhole + userDelta == this frame's scroll, rebase-safe via prevY.)
+  // inside a project the strip covers big pixel distances, so the rate drops
+  // and a °/s cap keeps a fast flick from whipping the square.
   const metroMove = autoWhole + userDelta;
   if (metroMove) {
-    metroDeg = (metroDeg + metroMove * METRO_DEG_PER_PX) % 360;
+    const rate = detailOpen ? METRO_DEG_PER_PX * METRO_CASE_SCALE : METRO_DEG_PER_PX;
+    const cap = METRO_MAX_DPS * dt / 1000;   // frame-rate independent speed limit
+    const step = THREE.MathUtils.clamp(metroMove * rate, -cap, cap);
+    metroDeg = (metroDeg + step) % 360;
     metroEl.style.transform = 'rotate(' + metroDeg.toFixed(2) + 'deg)';
   }
 
