@@ -15,13 +15,13 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=33';
+import { initWorksBed } from './worksbed.js?v=34';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=33'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=34'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -238,6 +238,10 @@ function fitContain(item) {
 */
 let caseTrack = null;   // { items, starts, N }
 const CASE_LOOPS = 4;
+// case images decode async → the strip re-flows as real dimensions land.
+// while a project is freshly mounted and untouched, keep its first image
+// pinned to the top so the arrival never appears to "scroll to find" it.
+let casePinTop = false;
 const DETAIL_LIFT = 1.22;   // exposure lift for in-project images (they read dark otherwise)
 
 function makeSlideMaterial(texture) {
@@ -318,7 +322,23 @@ function relayoutCase() {
     tex.offset.set(0, 0);
   }
   caseTrack.trackH = acc;
-  if (detailOpen) spacer.style.height = (CASE_LOOPS * acc) + 'px';
+  if (detailOpen) {
+    spacer.style.height = (CASE_LOOPS * acc) + 'px';
+    // re-flowed while freshly mounted → re-pin the first image to the top so
+    // late-decoding images settle BELOW the fold, not by shoving the hero.
+    if (casePinTop) {
+      const y = caseTopY();
+      window.scrollTo(0, y);
+      smooth = lastSmooth = prevY = y; scrollDif = 0;
+    }
+  }
+}
+
+// scroll offset that puts the project's first image flush with the top of the
+// viewport (pos ≡ VH/2, independent of trackH so it survives re-flows).
+function caseTopY() {
+  const cyc = (caseTrack && caseTrack.trackH) || VH;
+  return Math.floor(CASE_LOOPS / 2) * cyc + VH / 2;
 }
 
 
@@ -491,10 +511,11 @@ metroEl.addEventListener('click', () => {
 });
 
 for (const ev of ['wheel', 'touchstart']) {
-  window.addEventListener(ev, () => stopAuto(), { passive: true });
+  window.addEventListener(ev, () => { casePinTop = false; stopAuto(); }, { passive: true });
 }
 window.addEventListener('keydown', (e) => {
   if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Home', 'End'].includes(e.key)) {
+    casePinTop = false;   // visitor took the wheel — stop holding the top
     stopAuto();
   }
 });
@@ -596,6 +617,7 @@ function populateCard(i) {
 function mountCase(i) {
   detailOpen = true;
   detailIdx = i;
+  casePinTop = false;   // armed only after the snap below, so the build re-flow is quiet
   populateCard(i);
   detailEl.hidden = false;
 
@@ -611,10 +633,11 @@ function mountCase(i) {
   spacer.style.height = (CASE_LOOPS * cyc) + 'px';
   void spacer.offsetHeight;   // force reflow so the page is actually scrollable to y (mobile)
   // start at the project's first image, top-aligned
-  const y = Math.floor(CASE_LOOPS / 2) * cyc + VH / 2;
+  const y = caseTopY();
   window.scrollTo(0, y);
   smooth = y; lastSmooth = y; scrollDif = 0;
   prevY = y; userVel = 0;   // no smear flash from the position jump
+  casePinTop = true;        // hold the top through async image re-flows
 
   // lens off instantly — we're at black, no need to animate it
   delete tweens.displacement;
@@ -801,7 +824,7 @@ function frame(now) {
     } else {
       auto.acc += SETTINGS.autoSpeed * dt / 1000;
       autoWhole = Math.trunc(auto.acc);
-      if (autoWhole !== 0) { window.scrollBy(0, autoWhole); auto.acc -= autoWhole; }
+      if (autoWhole !== 0) { casePinTop = false; window.scrollBy(0, autoWhole); auto.acc -= autoWhole; }
     }
   }
 
