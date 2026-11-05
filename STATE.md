@@ -1,6 +1,9 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.43 — the IAAH launch build, on lab as FOVEA V.2**
+_Last updated: 2026-11-05_ · **V.44 — the IAAH launch build, on lab as FOVEA V.2**
+
+V.44: inside a project the scrim is shorter (36vh, 340px at most) and the copy sits lower and further
+in (56 px from the left on a laptop, 36 on a phone).
 
 V.43: the write-up is set exactly as study B1 sets it — one paragraph, then `Contact:` in ink with the
 address in mute; the Instagram line is Ness's own name, @nessimhigson (confirmed by Ness). Close is an

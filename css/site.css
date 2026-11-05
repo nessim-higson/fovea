@@ -146,16 +146,16 @@ html.intro .overlay > * { pointer-events: none; }
 
 /* ═══ inside a project: a scrim rises from the bottom so the copy reads over the image ═══ */
 .scrim {
-  position: absolute; left: 0; right: 0; bottom: 0; height: min(46vh, 420px); pointer-events: none;
+  position: absolute; left: 0; right: 0; bottom: 0; height: min(36vh, 340px); pointer-events: none;
   background: linear-gradient(to top, rgba(0, 0, 0, .78) 0%, rgba(0, 0, 0, .5) 38%, rgba(0, 0, 0, 0) 100%);
   opacity: 0; transition: opacity .6s ease-out;
 }
 body.in-project .scrim { opacity: 1; }
-.detail { position: absolute; left: calc(var(--sl) + 16px); bottom: calc(var(--sb) + 16px); max-width: 44ch; font-size: 11px; line-height: 1.45; color: var(--mute); }
+.detail { position: absolute; left: calc(var(--sl) + 32px); bottom: calc(var(--sb) + 4px); max-width: 44ch; font-size: 11px; line-height: 1.45; color: var(--mute); }
 .detail[hidden] { display: none; }
 .detail-meta { display: block; font-weight: 500; color: var(--ink); }
 .detail-desc { margin-top: 0; }
-@media (max-width: 759px) { .detail { right: calc(var(--sr) + 16px); max-width: none; bottom: calc(var(--sb) + 60px); } }
+@media (max-width: 759px) { .detail { left: calc(var(--sl) + 20px); right: calc(var(--sr) + 20px); max-width: none; bottom: calc(var(--sb) + 8px); } }
 
 /* the rest of the controls stay hidden on the public site (V.36); the keyboard still works (G — effects panel) */
 .lens-btn, .hint, .version, .beat-dot { display: none; }
