@@ -31,7 +31,7 @@ void main(){
   gl_FragColor=vec4(texture2D(uTex,n).rgb,1.0);   // no vignette/diffusion — crisp bed
 }`;
 
-export function initWorksBed({ container, projects, onEnter, isPlaying, label = (t) => t }) {
+export function initWorksBed({ container, projects, onEnter, isPlaying, label = (t) => t, onMotion = null }) {
   container.innerHTML =
     '<canvas class="wb-gl"></canvas>' +
     '<div class="wb-cap"></div>' +
@@ -44,7 +44,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying, label = 
   const flashEl = container.querySelector('.wb-flash');
   container.querySelector('.wb-close').onclick = () => close();
 
-  const gl = cv.getContext('webgl', { antialias: true });
+  const gl = cv.getContext('webgl', { antialias: false, depth: false, stencil: false, powerPreference: 'high-performance' });   // a field of quads: multisampling and depth buy nothing (V.55)
   function mk(vs, fs) { const p = gl.createProgram();
     const a = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(a, vs); gl.compileShader(a); gl.attachShader(p, a);
     const b = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(b, fs); gl.compileShader(b); gl.attachShader(p, b);
@@ -159,7 +159,9 @@ export function initWorksBed({ container, projects, onEnter, isPlaying, label = 
       } else if (Math.abs(zoom) < 0.03 && zoomTarget === 0 && (isPlaying ? isPlaying() : true)) { ox += 0.22; oy += 0.16; }
       zoom += (zoomTarget - zoom) * 0.1;
     }
-    vel = Math.min(46, Math.hypot(ox - pox, oy - poy) * 1.3); pox = ox; poy = oy;
+    const moved = Math.hypot(ox - pox, oy - poy);
+    vel = Math.min(46, moved * 1.3); pox = ox; poy = oy;
+    if (onMotion && moved) onMotion(moved, dtMs);   // the mark turns with the field, as it does with the scroll
     const fc = diveActive ? null : focusCell();
     if (fc) { const k = fc.c + ',' + fc.r; if (k !== lastFocus) { lastFocus = k; const o = cell(fc.c, fc.r);
       if (o) { cap.innerHTML = `${label(o.p.client)}<span class="yr">${o.p.year}</span>`; cap.style.opacity = 1; } } }

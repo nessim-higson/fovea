@@ -14,14 +14,14 @@ import * as THREE from 'three';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=54';
-import { initAbout } from './about.js?v=54';
+import { initWorksBed } from './worksbed.js?v=55';
+import { initAbout } from './about.js?v=55';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=54'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=55'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -43,7 +43,8 @@ let detailIdx = -1;
 
 /* ── renderer + scenes ─────────────────────────────────────────────── */
 const renderer = new THREE.WebGLRenderer({
-  canvas: document.getElementById('gl'), antialias: true,
+  canvas: document.getElementById('gl'), antialias: false,   // a full-screen quad: multisampling buys nothing and costs a phone dearly (V.55)
+  depth: false, stencil: false, powerPreference: 'high-performance',
 });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, COARSE ? 1.25 : 2));   // a phone's lens pass at 1.25 (V.49: was 1.5 — the load stuttered)
 
@@ -57,11 +58,12 @@ const sceneA = new THREE.Scene();
 sceneA.background = new THREE.Color(0x000000);
 const sceneB = new THREE.Scene();
 
-const rt = new THREE.WebGLRenderTarget(1, 1);  // sized in layout()
+const RT_OPTS = { depthBuffer: false, stencilBuffer: false };   // flat planes, no depth: skip the depth attachment (bandwidth on a phone)
+const rt = new THREE.WebGLRenderTarget(1, 1, RT_OPTS);  // sized in layout()
 
-// ping-pong buffers for the feedback effect (previous frame → next frame)
-let fbA = new THREE.WebGLRenderTarget(1, 1);
-let fbB = new THREE.WebGLRenderTarget(1, 1);
+// ping-pong buffers for the feedback effect (previous frame → next frame); sized only when that effect is on
+let fbA = new THREE.WebGLRenderTarget(1, 1, RT_OPTS);
+let fbB = new THREE.WebGLRenderTarget(1, 1, RT_OPTS);
 let prevFb = fbA, curFb = fbB;
 
 /* ── image track ───────────────────────────────────────────────────
@@ -168,12 +170,15 @@ function loadMedia(src, holder, done = () => {}) {
     // exhaust GPU memory on phones. Cap the longest edge, keep the aspect.
     const img = new Image(); img.crossOrigin = 'anonymous'; img.decoding = 'async';
     const webp = /\.jpg$/i.test(src) ? src.replace(/\.jpg$/i, '_m.webp') : null;   // the 1400 px WebP, a third of the JPEG's bytes
-    img.onload = () => (img.decode ? img.decode().catch(() => {}) : Promise.resolve()).then(() => {   // decode off the main thread first
+    // decode off the main thread first; a decode can hang in a hidden tab, so a timer stands in after 1.5 s
+    const decoded = img.decode ? Promise.race([img.decode().catch(() => {}), new Promise(r => setTimeout(r, 1500))]) : Promise.resolve();
+    img.onload = () => decoded.then(() => {
       const MAX = COARSE ? 1000 : 1600, nw = img.naturalWidth, nh = img.naturalHeight;
       let w = nw, h = nh;
       if (Math.max(w, h) > MAX) { const s = MAX / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
       const c = document.createElement('canvas'); c.width = w; c.height = h;
       c.getContext('2d').drawImage(img, 0, 0, w, h);
+      holder.lum = lumGrid(c);   // 3×3 luminance, for the nav's colour on a phone (no GPU readback)
       const t = new THREE.CanvasTexture(c);
       t.colorSpace = THREE.SRGBColorSpace;
       holder.mat.uniforms.map.value = t;
@@ -184,6 +189,16 @@ function loadMedia(src, holder, done = () => {}) {
     img.onerror = () => { if (webp && img.src.endsWith('_m.webp')) { img.src = src; } else fin(); };   // no WebP there: the JPEG
     img.src = webp || src;
   }
+}
+
+// a 3×3 grid of an image's luminance (0..1), rows top to bottom: what sits under the nav words
+const lumCanvas = document.createElement('canvas'); lumCanvas.width = lumCanvas.height = 3;
+function lumGrid(src) {
+  const x = lumCanvas.getContext('2d', { willReadFrequently: true });
+  x.drawImage(src, 0, 0, 3, 3);
+  const d = x.getImageData(0, 0, 3, 3).data, g = [];
+  for (let r = 0; r < 3; r++) { const row = []; for (let c = 0; c < 3; c++) { const k = (r * 3 + c) * 4; row.push((0.2126 * d[k] + 0.7152 * d[k + 1] + 0.0722 * d[k + 2]) / 255); } g.push(row); }
+  return g;
 }
 
 // 1×1 black placeholder shown until real media streams in — so a real
@@ -403,6 +418,7 @@ function setEffect(id) {
     });
   }
   activeEffect = id;
+  if (id === 'feedback') { const pr = renderer.getPixelRatio(); fbA.setSize(VW * pr, VH * pr); fbB.setSize(VW * pr, VH * pr); }
   lensQuad.material = materials[id];
   rebuildParamsFolder();
 }
@@ -456,8 +472,7 @@ function layout() {
   renderer.setSize(VW, VH);
   const pr = renderer.getPixelRatio();
   rt.setSize(VW * pr, VH * pr);
-  fbA.setSize(VW * pr, VH * pr);
-  fbB.setSize(VW * pr, VH * pr);
+  if (activeEffect === 'feedback') { fbA.setSize(VW * pr, VH * pr); fbB.setSize(VW * pr, VH * pr); }
   for (const cam of [camA, camB]) {
     cam.left = -VW / 2; cam.right = VW / 2;
     cam.top = VH / 2; cam.bottom = -VH / 2;
@@ -559,6 +574,14 @@ function stopAuto(resumable = true) {
     auto.idleTimer = setTimeout(startAuto, SETTINGS.autoResume * 1000);
   }
 }
+// the mark turns with any motion: so many degrees per pixel, capped per second (the bed calls this too)
+function turnMetroWith(px, dtMs) {
+  const rate = detailOpen ? METRO_DEG_PER_PX * METRO_CASE_SCALE : METRO_DEG_PER_PX;
+  const cap = METRO_MAX_DPS * dtMs / 1000;   // frame-rate independent speed limit
+  const step = THREE.MathUtils.clamp(px * rate, -cap, cap);
+  metroDeg = (metroDeg + step) % 360;
+  metroSq.style.transform = 'rotate(' + metroDeg.toFixed(2) + 'deg)';
+}
 // the mark's own turn, on demand (the write-up opening): a quarter further, 1.5 s,
 // the one ease — then the scroll-driven rotation carries on from there.
 function turnMetro(deg = 90, ms = 1500) {
@@ -655,6 +678,7 @@ const worksBed = initWorksBed({
   onEnter: (i) => diveToProject(i),
   isPlaying: () => !metroPaused,        // the square's tempo conducts the drift
   label: (t) => titleCase(t),           // the bed's captions in sentence case, like the title word
+  onMotion: (px, dtMs) => turnMetroWith(px * 0.5, dtMs),   // the mark turns with the field, the landing's rate scaled for the bed's pixels
 });
 document.getElementById('works-btn').addEventListener('click', () => {
   if (about.isOpen()) about.close();
@@ -878,6 +902,7 @@ window.__about = about;
 window.__vh = () => [VW, VH, smooth, window.scrollY];   // for checks: the layout's idea of the viewport and the loop position
 window.__layout = layout;
 window.__bed = worksBed;
+window.__slides = slides; window.__lumUnder = lumUnder; window.__turnMetroWith = turnMetroWith;
 window.__audio = audio;
 window.__state = state;
 window.__vel = () => userVel;
@@ -954,13 +979,7 @@ function frame(now) {
   // inside a project the strip covers big pixel distances, so the rate drops
   // and a °/s cap keeps a fast flick from whipping the square.
   const metroMove = autoWhole + userDelta;
-  if (metroMove) {
-    const rate = detailOpen ? METRO_DEG_PER_PX * METRO_CASE_SCALE : METRO_DEG_PER_PX;
-    const cap = METRO_MAX_DPS * dt / 1000;   // frame-rate independent speed limit
-    const step = THREE.MathUtils.clamp(metroMove * rate, -cap, cap);
-    metroDeg = (metroDeg + step) % 360;
-    metroSq.style.transform = 'rotate(' + metroDeg.toFixed(2) + 'deg)';
-  }
+  if (metroMove) turnMetroWith(metroMove, dt);
 
   const vel = THREE.MathUtils.clamp(
     userVel, -SETTINGS.maxVelocity, SETTINGS.maxVelocity);
@@ -1044,8 +1063,30 @@ function frame(now) {
    just drawn under each word and flip it ink / paper with some hysteresis ── */
 const navEls = [...document.querySelectorAll('.nav')];
 const navBuf = new Uint8Array(8 * 8 * 4);
-let navTick = 0; const NAV_EVERY = COARSE ? 30 : 8;
+let navTick = 0; const NAV_EVERY = COARSE ? 10 : 8;   // the phone's sampling is cheap now (no readback), so it can be frequent
+// what image is under a point of the viewport, and which cell of its 3×3 grid
+function lumUnder(ex, ey) {
+  const col = Math.min(2, Math.floor(ex / VW * 3));
+  if (detailOpen && caseTrack) {
+    const cyc = caseTrack.trackH || VH, pos = ((smooth % cyc) + cyc) % cyc, y = (((pos - VH / 2 + ey) % cyc) + cyc) % cyc;
+    for (let k = 0; k < caseTrack.N; k++) { const t = caseTrack.tops[k], h = caseTrack.heights[k];
+      if (y >= t && y < t + h) { const it = caseTrack.items[k]; return it.lum ? it.lum[Math.min(2, Math.floor((y - t) / h * 3))][col] : null; } }
+    return null;
+  }
+  const cyc = cycleH(), pos = ((smooth % cyc) + cyc) % cyc, y = (((pos - VH / 2 + ey) % cyc) + cyc) % cyc;
+  const i = Math.floor(y / VH) % PROJECTS.length, s = slides[i];
+  return s && s.lum ? s.lum[Math.min(2, Math.floor((y - i * VH) / VH * 3))][col] : null;
+}
 function sampleNav() {
+  if (IS_TOUCH) {   // no GPU readback on a phone: the image's own grid stands in for the frame
+    for (const el of navEls) {
+      if (el.hidden) continue;
+      const r = el.getBoundingClientRect(), lum = lumUnder(r.left + r.width / 2, r.top + r.height / 2);
+      if (lum == null) continue;
+      if (lum > 0.6) el.classList.add('dark'); else if (lum < 0.42) el.classList.remove('dark');
+    }
+    return;
+  }
   const gl = renderer.getContext(), pr = renderer.getPixelRatio();
   const cw = gl.drawingBufferWidth, ch = gl.drawingBufferHeight;
   for (const el of navEls) {

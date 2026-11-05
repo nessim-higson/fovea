@@ -1,6 +1,14 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-06_ · **V.54 — LIVE on https://iamalwayshungry.com**
+_Last updated: 2026-11-06_ · **V.55 — LIVE on https://iamalwayshungry.com**
+
+V.55: **the mark turns with the Works bed** (`onMotion` from `worksbed.js` → `turnMetroWith`, the landing's
+rate at half, same °/s cap). **Phone performance:** both WebGL contexts without multisampling, depth or
+stencil (`antialias:false`; a full-screen quad gains nothing from MSAA); render targets without depth
+attachments; the feedback ping-pong buffers sized only when that effect is on; on touch devices the nav's
+colour comes from a 3×3 luminance grid read once per image at load (`lumGrid`, `lumUnder`) instead of a
+GPU readback every N frames (desktop keeps `readPixels`). `img.decode()` is raced against a 1.5 s timer:
+it never settles in a hidden tab and would stall the whole loader. Debug: `__slides`, `__lumUnder`, `__bed.debug()`.
 
 V.54 (6 Nov): **the mark is top left on every screen** — `.metro` lives outside `.overlay` at z 40 (above
 the bed's 30); on the bed a click is the way home. **Loading:** every full image has a 1400 px WebP
