@@ -1,6 +1,15 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.46 — LIVE on https://iamalwayshungry.com**
+_Last updated: 2026-11-05_ · **V.48 — LIVE on https://iamalwayshungry.com**
+
+V.48 (evening): **the Works bed glides on touch** — the finger's velocity over its last 100 ms carries on
+after the lift and decays at 0.998/ms (iOS's normal rate, capped at 4 px/ms), a finger or a wheel stops it
+(`vx/vy` in `worksbed.js`); the Apple page it was measured against scrolls natively, so native momentum is
+the target. **A loader queue** (`queueLoad`/`pumpLoads` in `app.js`): three loads at a time; the landing
+cover first, then its neighbours either way round the loop; a project's images in order, ahead of the
+queue; disposed holders are skipped. **Sound is on by default**: the first pointerdown or key anywhere
+starts it (browser policy needs a gesture) unless the visitor pressed the word themselves. **The bed's
+close is the word Close**; the × stays for a project. V.47: small words lowercase inside titles.
 
 V.46: the landing starts on a random project each visit (`START` in `app.js`; `?start=<n>` pins one).
 

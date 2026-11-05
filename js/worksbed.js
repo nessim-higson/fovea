@@ -36,7 +36,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying, label = 
     '<canvas class="wb-gl"></canvas>' +
     '<div class="wb-cap"></div>' +
     '<div class="wb-toggle"></div>' +
-    '<button class="wb-close" aria-label="Back to the landing">&#215;</button>' +
+    '<button class="wb-close nav" aria-label="Back to the landing">Close</button>' +
     '<div class="wb-flash"></div>';
   const cv = container.querySelector('.wb-gl');
   const cap = container.querySelector('.wb-cap');
@@ -96,6 +96,10 @@ export function initWorksBed({ container, projects, onEnter, isPlaying, label = 
   let zoom = 0, zoomTarget = 0, zoomC = [0.5, 0.5], diveActive = false;
   let panFromX = 0, panFromY = 0, panToX = 0, panToY = 0, diveT0 = 0;
   let hoverPt = null, lastFocus = '';
+  // touch momentum: the finger's velocity (px/ms) carries on after it lifts and decays
+  // like a native scroll (iOS's normal deceleration, 0.998 per ms), so a swipe glides.
+  let vx = 0, vy = 0, samples = [], lastFrame = 0;
+  const DECAY = 0.998;
   const smoothstep = t => t * t * (3 - 2 * t);
   const W = () => innerWidth, H = () => innerHeight;
 
@@ -138,6 +142,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying, label = 
     if (!running) return;
     const dpr = Math.min(COARSE ? 1.25 : 2, devicePixelRatio || 1);
     if (cv.width !== W() * dpr) { cv.width = W() * dpr; cv.height = H() * dpr; makeFBO(); }
+    const dtMs = lastFrame ? Math.min((now || performance.now()) - lastFrame, 50) : 16; lastFrame = now || performance.now();
     if (diveActive) {
       const e = (now || performance.now()) - diveT0;
       const tf = smoothstep(Math.min(1, e / 240));                       // focus: slide the tile to centre
@@ -145,7 +150,11 @@ export function initWorksBed({ container, projects, onEnter, isPlaying, label = 
       oy = panFromY + (panToY - panFromY) * tf;
       zoom = smoothstep(Math.min(1, Math.max(0, (e - 200) / 460)));       // then zoom into the centred tile
     } else {
-      if (Math.abs(zoom) < 0.03 && zoomTarget === 0 && (isPlaying ? isPlaying() : true)) { ox += 0.22; oy += 0.16; }
+      if (vx || vy) {   // the glide after a swipe
+        ox += vx * dtMs; oy += vy * dtMs;
+        const k = Math.pow(DECAY, dtMs); vx *= k; vy *= k;
+        if (Math.hypot(vx, vy) < 0.01) vx = vy = 0;
+      } else if (Math.abs(zoom) < 0.03 && zoomTarget === 0 && (isPlaying ? isPlaying() : true)) { ox += 0.22; oy += 0.16; }
       zoom += (zoomTarget - zoom) * 0.1;
     }
     vel = Math.min(46, Math.hypot(ox - pox, oy - poy) * 1.3); pox = ox; poy = oy;
@@ -192,16 +201,26 @@ export function initWorksBed({ container, projects, onEnter, isPlaying, label = 
   }
 
   // input — scroll / swipe to move, click / tap to enter
-  function onWheel(e) { if (!running || diveActive || zoomTarget !== 0) return; e.preventDefault(); ox -= e.deltaX; oy -= e.deltaY; }
+  function onWheel(e) { if (!running || diveActive || zoomTarget !== 0) return; e.preventDefault(); vx = vy = 0; ox -= e.deltaX; oy -= e.deltaY; }
   container.addEventListener('wheel', onWheel, { passive: false });
   container.addEventListener('pointermove', e => { if (e.pointerType === 'touch') return; hoverPt = [e.clientX, e.clientY]; });
   container.addEventListener('click', e => { if (e.target.closest('.wb-toggle,.wb-close')) return; if (!diveActive) enter(); });
   let tx = 0, ty = 0, tmoved = 0, touching = false;
-  container.addEventListener('touchstart', e => { const t = e.touches[0]; tx = t.clientX; ty = t.clientY; tmoved = 0; touching = true; hoverPt = [tx, ty]; }, { passive: true });
+  container.addEventListener('touchstart', e => { const t = e.touches[0]; tx = t.clientX; ty = t.clientY; tmoved = 0; touching = true; hoverPt = [tx, ty];
+    vx = vy = 0; samples = [[tx, ty, performance.now()]]; }, { passive: true });   // a finger down stops any glide
   container.addEventListener('touchmove', e => { if (diveActive) return; e.preventDefault();   // don't let the page scroll under the bed
-    const t = e.touches[0];
-    const dx = t.clientX - tx, dy = t.clientY - ty; ox += dx; oy += dy; tmoved += Math.abs(dx) + Math.abs(dy); tx = t.clientX; ty = t.clientY; hoverPt = [t.clientX, t.clientY]; }, { passive: false });
-  container.addEventListener('touchend', e => { if (touching && tmoved < 8 && !diveActive) { e.preventDefault(); hoverPt = [tx, ty]; enter(); } touching = false; }, { passive: false });
+    const t = e.touches[0], tn = performance.now();
+    const dx = t.clientX - tx, dy = t.clientY - ty; ox += dx; oy += dy; tmoved += Math.abs(dx) + Math.abs(dy); tx = t.clientX; ty = t.clientY; hoverPt = [t.clientX, t.clientY];
+    samples.push([tx, ty, tn]); while (samples.length > 2 && tn - samples[0][2] > 100) samples.shift(); }, { passive: false });
+  container.addEventListener('touchend', e => {
+    if (touching && tmoved < 8 && !diveActive) { e.preventDefault(); hoverPt = [tx, ty]; enter(); }
+    else if (samples.length > 1) {   // the lift: velocity over the last ~100 ms becomes the glide
+      const a = samples[0], b = samples[samples.length - 1], dt = b[2] - a[2];
+      if (dt > 0 && performance.now() - b[2] < 80) { vx = (b[0] - a[0]) / dt; vy = (b[1] - a[1]) / dt;
+        const sp = Math.hypot(vx, vy), cap = 4; if (sp > cap) { vx *= cap / sp; vy *= cap / sp; } if (sp < 0.05) vx = vy = 0; }
+    }
+    touching = false; }, { passive: false });
+  container.addEventListener('touchcancel', () => { touching = false; });
   addEventListener('resize', () => { if (running) { const dpr = Math.min(COARSE ? 1.25 : 2, devicePixelRatio || 1); cv.width = W() * dpr; cv.height = H() * dpr; makeFBO(); } });
 
   function open(startGlobal) {
@@ -214,7 +233,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying, label = 
   function hide() {
     running = false; container.hidden = true; document.body.style.overflow = '';
     container.style.transition = ''; container.style.opacity = '';
-    zoom = 0; zoomTarget = 0; diveActive = false;
+    zoom = 0; zoomTarget = 0; diveActive = false; vx = vy = 0; lastFrame = 0;
   }
   function close(immediate) {
     if (immediate) { hide(); return; }

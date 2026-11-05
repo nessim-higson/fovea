@@ -15,14 +15,14 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=47';
-import { initAbout } from './about.js?v=47';
+import { initWorksBed } from './worksbed.js?v=48';
+import { initAbout } from './about.js?v=48';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=47'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=48'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -110,7 +110,24 @@ const imageFrag = /* glsl */`
    technique the reference site uses for its film content.
 */
 const VIDEO_RE = /\.(mp4|m4v|webm|mov)(\?.*)?$/i;
-function loadMedia(src, holder) {
+// the loader queue (V.48): nothing loads all at once. Three at a time, in the
+// order they are wanted — the landing project first, then its neighbours either
+// way round the loop, then the rest; a project's images in order, ahead of the queue.
+const loadQueue = []; let loadsLive = 0; const LOADS_AT_ONCE = 3;
+function pumpLoads() {
+  while (loadsLive < LOADS_AT_ONCE && loadQueue.length) {
+    const { src, holder } = loadQueue.shift();
+    if (holder.disposed) continue;
+    loadsLive++;
+    loadMedia(src, holder, () => { loadsLive--; pumpLoads(); });
+  }
+}
+function queueLoad(src, holder, first = false) {
+  if (first) loadQueue.unshift({ src, holder }); else loadQueue.push({ src, holder });
+  pumpLoads();
+}
+function loadMedia(src, holder, done = () => {}) {
+  let finished = false; const fin = () => { if (!finished) { finished = true; done(); } };
   if (VIDEO_RE.test(src)) {
     // poster still FIRST — the slot is never black, and it's the graceful
     // fallback if the video can't play (autoplay block, decode, slow net).
@@ -132,7 +149,9 @@ function loadMedia(src, holder) {
     holder.video = v;
     // wait for a REAL frame (loadeddata, not just metadata) before texturing —
     // uploading a frameless video is what throws / shows black.
+    v.addEventListener('error', fin, { once: true });
     v.addEventListener('loadeddata', () => {
+      fin();
       holder._videoLive = true;
       holder.imgW = v.videoWidth || 16;
       holder.imgH = v.videoHeight || 9;
@@ -159,7 +178,9 @@ function loadMedia(src, holder) {
       t.colorSpace = THREE.SRGBColorSpace;
       holder.mat.uniforms.map.value = t;
       holder.imgW = nw; holder.imgH = nh; holder.fit();
+      fin();
     };
+    img.onerror = fin;
     img.src = src;
   }
 }
@@ -190,8 +211,7 @@ const slides = PROJECTS.map((p, i) => {
   sceneA.add(mesh);
   const slide = { mesh, mat, imgW: 1080, imgH: 1440 };
   slide.fit = () => fitCover(slide);   // home = full-bleed immersive
-  if (p.image) loadMedia(p.image, slide);
-  return slide;
+  return slide;   // loaded once START is known (below), nearest first
 });
 
 // cover-fit a texture to the viewport-sized plane via UV transform
@@ -268,6 +288,7 @@ function makeSlideMaterial(texture) {
 function disposeCaseTrack() {
   if (!caseTrack) return;
   caseTrack.items.forEach((it) => {
+    it.disposed = true;   // anything still queued for it is skipped
     sceneA.remove(it.mesh);
     if (it.video) { it.video.pause(); it.video.removeAttribute('src'); }
     const tex = it.mat.uniforms.map.value;
@@ -292,9 +313,11 @@ function buildCaseTrack(only) {
     sceneA.add(mesh);
     const item = { mesh, mat, imgW: 1080, imgH: 1440 };
     item.fit = relayoutCase;   // an image load re-flows this project's track
-    if (isUrl) loadMedia(src, item);
     items.push(item);
+    if (isUrl) item.src = src;
   });
+  // in order, ahead of the queue: the first image is wanted now, the last least
+  for (let k = items.length - 1; k >= 0; k--) if (items[k].src) queueLoad(items[k].src, items[k], true);
   caseTrack = { items, proj: only, N: items.length, heights: [], tops: [], trackH: 0 };
   window.__caseTrack = caseTrack;
   relayoutCase();
@@ -443,6 +466,12 @@ window.addEventListener('resize', layout);
 const START = (() => { const q = new URLSearchParams(location.search).get('start');
   return q != null && PROJECTS[+q] ? +q : Math.floor(Math.random() * PROJECTS.length); })();
 window.scrollTo(0, Math.floor(LOOPS / 2) * cycleH() + START * VH);
+// load the covers nearest the landing first, then outward both ways round the loop
+{ const n = PROJECTS.length;
+  for (let d = 0; d <= n / 2; d++) for (const i of d ? [(START + d) % n, (START - d + n) % n] : [START]) {
+    if (i < 0 || i >= n || slides[i].queued || !PROJECTS[i].image) continue;
+    slides[i].queued = true; queueLoad(PROJECTS[i].image, slides[i]);
+  } }
 
 let smooth = window.scrollY, lastSmooth = smooth, scrollDif = 0;
 // velocity that drives the distortion is computed from USER scroll only —
@@ -575,10 +604,21 @@ lensBtn.addEventListener('click', () => setLens(!ui.lens));
 /* ── ambient audio (user gesture required by browser policy) ───────── */
 const audio = createAudioEngine(SETTINGS);
 const soundBtn = document.getElementById('sound-btn');
+let soundRunning = false, soundChosen = false;   // chosen = the visitor pressed the word themselves
 soundBtn.addEventListener('click', () => {
-  const on = audio.toggle();
-  soundBtn.classList.toggle('on', on);
+  soundChosen = true;
+  soundRunning = audio.toggle();
+  soundBtn.classList.toggle('on', soundRunning);
 });
+// sound is on by default (V.48): the browser only lets it start on a gesture, so
+// the first tap, click or key anywhere starts it — unless the visitor chose otherwise
+function soundAtFirstTouch() {
+  if (soundChosen || soundRunning) return;
+  soundRunning = audio.toggle();
+  soundBtn.classList.toggle('on', soundRunning);
+}
+addEventListener('pointerdown', soundAtFirstTouch, { once: true, capture: true });
+addEventListener('keydown', soundAtFirstTouch, { once: true, capture: true });
 
 /* ── global nav: the Works bed ─────────────────────────────────────── */
 function worksBedOpen() { return typeof worksBed !== 'undefined' && worksBed.isOpen(); }
