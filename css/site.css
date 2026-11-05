@@ -94,8 +94,7 @@ html.intro .overlay > * { pointer-events: none; }
 /* top-right: Close (inside a project) · Works */
 .top { position: absolute; right: var(--sr); top: var(--st); display: flex; gap: 4px; }
 .detail-x[hidden] { display: none; }
-/* Sound — bottom right */
-.sound-btn { position: absolute; right: var(--sr); bottom: var(--sb); }
+/* Sound sits in the top row with Works; a 6 px square marks it on */
 .sound-btn.on::before { content: ''; width: 6px; height: 6px; margin-right: 8px; background: currentColor; }
 /* View — dive into the project in view, straight from the landing — bottom centre */
 /* the project's title, bottom centre, in sentence case: the way in besides the cover itself */
@@ -168,11 +167,14 @@ body.in-project .scrim { opacity: 1; }
 .works-bed[hidden] { display: none; }
 .wb-gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; cursor: default; }
 .wb-cap {
-  position: absolute; left: 50%; bottom: calc(var(--sb) + 48px); transform: translateX(-50%); z-index: 6; pointer-events: none;
-  font-size: 13px; color: var(--ink); text-shadow: 0 2px 14px #000;
+  position: absolute; left: 50%; bottom: var(--sb); transform: translateX(-50%); z-index: 6; pointer-events: none;
+  display: inline-flex; align-items: center; height: 32px; padding: 0 13px;
+  font-size: 11px; line-height: 1; letter-spacing: .02em; color: var(--ink); border: 1px solid rgba(236, 236, 232, .28); border-radius: 999px;
   opacity: 0; transition: opacity .25s; white-space: nowrap;
 }
-.wb-cap .yr { margin-left: 10px; color: var(--mute); font-variant-numeric: tabular-nums; }
+.wb-cap .yr { margin-left: 8px; color: var(--mute); font-variant-numeric: tabular-nums; }
+.wb-hint { display: none; }
+@media (max-width: 759px) { .wb-cap { height: 40px; } }
 .wb-toggle { position: absolute; left: 50%; bottom: var(--sb); transform: translateX(-50%); z-index: 9; display: flex; gap: 4px; }
 .wb-toggle button { color: var(--mute); }
 .wb-toggle button.on { color: var(--ink); border-color: currentColor; }

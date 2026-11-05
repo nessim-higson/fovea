@@ -31,12 +31,11 @@ void main(){
   gl_FragColor=vec4(texture2D(uTex,n).rgb,1.0);   // no vignette/diffusion — crisp bed
 }`;
 
-export function initWorksBed({ container, projects, onEnter, isPlaying }) {
+export function initWorksBed({ container, projects, onEnter, isPlaying, label = (t) => t }) {
   container.innerHTML =
     '<canvas class="wb-gl"></canvas>' +
     '<div class="wb-cap"></div>' +
     '<div class="wb-toggle"></div>' +
-    '<div class="wb-hint">scroll / swipe to move · click to enter · esc to close</div>' +
     '<button class="wb-close" aria-label="Back to the landing">&#10005;&nbsp;Close</button>' +
     '<div class="wb-flash"></div>';
   const cv = container.querySelector('.wb-gl');
@@ -152,7 +151,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     vel = Math.min(46, Math.hypot(ox - pox, oy - poy) * 1.3); pox = ox; poy = oy;
     const fc = diveActive ? null : focusCell();
     if (fc) { const k = fc.c + ',' + fc.r; if (k !== lastFocus) { lastFocus = k; const o = cell(fc.c, fc.r);
-      cap.innerHTML = `${o.p.client}<span class="yr">${o.p.year}</span>`; cap.style.opacity = 1; } }
+      cap.innerHTML = `${label(o.p.client)}<span class="yr">${o.p.year}</span>`; cap.style.opacity = 1; } }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, cv.width, cv.height);
     gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);

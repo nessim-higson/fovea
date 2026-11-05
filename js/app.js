@@ -15,14 +15,14 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=40';
-import { initAbout } from './about.js?v=40';
+import { initWorksBed } from './worksbed.js?v=41';
+import { initAbout } from './about.js?v=41';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=40'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=41'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -585,6 +585,7 @@ const worksBed = initWorksBed({
   projects: PROJECTS,
   onEnter: (i) => diveToProject(i),
   isPlaying: () => !metroPaused,        // the square's tempo conducts the drift
+  label: (t) => titleCase(t),           // the bed's captions in sentence case, like the title word
 });
 document.getElementById('works-btn').addEventListener('click', () => {
   if (about.isOpen()) about.close();
@@ -970,8 +971,6 @@ function sampleNav() {
   const cw = gl.drawingBufferWidth, ch = gl.drawingBufferHeight;
   for (const el of navEls) {
     if (el.hidden) continue;
-    // inside a project the bottom words sit on the scrim, which the canvas can't see
-    if (detailOpen && el.classList.contains('sound-btn')) { el.classList.remove('dark'); continue; }
     const r = el.getBoundingClientRect();
     const x = Math.round((r.left + r.width / 2) * pr) - 4, y = Math.round((VH - (r.top + r.height / 2)) * pr) - 4;
     if (x < 0 || y < 0 || x + 8 > cw || y + 8 > ch) continue;

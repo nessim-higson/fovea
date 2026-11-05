@@ -1,6 +1,10 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.40 — the IAAH launch build, on lab as FOVEA V.2**
+_Last updated: 2026-11-05_ · **V.41 — the IAAH launch build, on lab as FOVEA V.2**
+
+V.41: the Works bed's hint line is gone; its caption is a sentence-case pill at the nav size, bottom
+centre, like the title word on the landing; Sound moved up into the top row beside Works (Close ·
+Works · Sound inside a project), so the bottom of the screen belongs to the title and the project copy.
 
 V.40 (the same evening): the project's title is back bottom centre as a sentence-case word in the nav
 style (click = into the project); the project copy sits 16 px further in from the edges; the write-up
