@@ -1,6 +1,8 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.45 — LIVE on https://iamalwayshungry.com**
+_Last updated: 2026-11-05_ · **V.46 — LIVE on https://iamalwayshungry.com**
+
+V.46: the landing starts on a random project each visit (`START` in `app.js`; `?start=<n>` pins one).
 
 **The domain moved on 5 Nov 2026 (afternoon).** DNS stayed at Media Temple, edited through GoDaddy's DNS
 page for the domain (dcc.godaddy.com → Portfolio → iamalwayshungry.com → DNS): the apex A record went
