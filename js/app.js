@@ -15,14 +15,14 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=46';
-import { initAbout } from './about.js?v=46';
+import { initWorksBed } from './worksbed.js?v=47';
+import { initAbout } from './about.js?v=47';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=46'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=47'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -734,7 +734,8 @@ window.addEventListener('keydown', (e) => {
 });
 
 // the chrome is sentence case; the scraped client names are shouted
-const titleCase = (t) => t.toLowerCase().replace(/(^|[\s(\-])([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\bIaah\b/g, 'IAAH').replace(/\bSqsp\b/g, 'SQSP').replace(/\bWetransfer\b/g, 'WeTransfer');
+const titleCase = (t) => t.toLowerCase().replace(/(^|[\s(\-])([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\bIaah\b/g, 'IAAH').replace(/\bSqsp\b/g, 'SQSP').replace(/\bWetransfer\b/g, 'WeTransfer')
+  .replace(/(?!^)\b(Of|And|The|A|To|In|X)\b/g, (m) => m.toLowerCase());   // small words stay small inside a title
 let lastViewIdx = -2;
 function updateNav() {
   // the View button names the cover currently in view, on the landing only
