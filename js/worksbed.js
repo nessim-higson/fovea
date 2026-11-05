@@ -66,6 +66,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying, label = 
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     const im = new Image(); im.crossOrigin = 'anonymous';
+    im.onerror = () => { if (im.src.endsWith('.webp')) im.src = url; };   // no WebP thumb: the JPEG
     im.onload = () => {
       // thumbnails only need ~640px — downscale before upload so the bed isn't
       // holding 25 full-res (1800px) textures in GPU memory on a phone
@@ -76,7 +77,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying, label = 
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cc); t.asp = nw / nh;
       t.ready = true;   // triggers the per-tile fade-in
     };
-    im.src = url; texCache[url] = t; return t;
+    im.src = url.replace(/_t\.jpg$/i, '_t.webp'); texCache[url] = t; return t;
   }
   let fbo, fboTex;
   function makeFBO() {
@@ -140,6 +141,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying, label = 
 
   function frame(now) {
     if (!running) return;
+    if (!W() || !H()) { requestAnimationFrame(frame); return; }   // a zero-size moment would NaN every cell and kill the loop
     const dpr = Math.min(COARSE ? 1.25 : 2, devicePixelRatio || 1);
     if (cv.width !== W() * dpr) { cv.width = W() * dpr; cv.height = H() * dpr; makeFBO(); }
     const dtMs = lastFrame ? Math.min((now || performance.now()) - lastFrame, 50) : 16; lastFrame = now || performance.now();
@@ -160,7 +162,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying, label = 
     vel = Math.min(46, Math.hypot(ox - pox, oy - poy) * 1.3); pox = ox; poy = oy;
     const fc = diveActive ? null : focusCell();
     if (fc) { const k = fc.c + ',' + fc.r; if (k !== lastFocus) { lastFocus = k; const o = cell(fc.c, fc.r);
-      cap.innerHTML = `${label(o.p.client)}<span class="yr">${o.p.year}</span>`; cap.style.opacity = 1; } }
+      if (o) { cap.innerHTML = `${label(o.p.client)}<span class="yr">${o.p.year}</span>`; cap.style.opacity = 1; } } }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, cv.width, cv.height);
     gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
@@ -240,5 +242,5 @@ export function initWorksBed({ container, projects, onEnter, isPlaying, label = 
     zoomTarget = 0.82;            // zoom back in toward the cover, then hide → reveals the landing
     setTimeout(hide, 360);
   }
-  return { open, close: () => close(false), isOpen: () => running };
+  return { open, close: () => close(false), isOpen: () => running, debug: () => ({ N: list.length, ox, oy, zoom, vx, vy, W: W(), H: H(), fc: diveActive ? null : focusCell(), hoverPt }) };
 }

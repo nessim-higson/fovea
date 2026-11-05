@@ -1,6 +1,16 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.53 — LIVE on https://iamalwayshungry.com**
+_Last updated: 2026-11-06_ · **V.54 — LIVE on https://iamalwayshungry.com**
+
+V.54 (6 Nov): **the mark is top left on every screen** — `.metro` lives outside `.overlay` at z 40 (above
+the bed's 30); on the bed a click is the way home. **Loading:** every full image has a 1400 px WebP
+beside it (`NN_m.webp`, cwebp q78, ~a third of the JPEG) and every thumb a WebP (`NN_t.webp`); the loader
+asks for the WebP and falls back to the JPEG on error. The opening (`intro.js`) now chooses the landing
+project (`window.__start`, from the covers inlined in `index.html` as `#covers`) and starts its cover
+download at t=0; `index.html` preconnects to esm.sh and modulepreloads three.mjs; lil-gui is imported only
+on the first G. The bed's frame loop survives a zero-size viewport. Regenerate derivatives after adding
+images: `cd content/iaah && find . -name '[0-9][0-9].jpg' -exec sh -c 'cwebp -q 78 -resize 1400 0 -m 6 "$1" -o "${1%.jpg}_m.webp"' _ {} \;`
+and the same for `_t.jpg` → `_t.webp` at q72 without resize.
 
 V.53: the phone's jump, properly — on a touch device `layout()` sizes the loop to the LARGE viewport from
 the first frame (a `100lvh` probe, `largeViewportHeight()`), so the address bar folding away on the first

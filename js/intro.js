@@ -15,6 +15,14 @@
 
   var resolve, done = new Promise(function (r) { resolve = r; });
   window.__intro = done;
+  /* the landing project is chosen here, not in app.js, so its cover (the 1400 px WebP) starts
+     downloading now; app.js reads window.__start and finds the file already in the cache */
+  try {
+    var covers = JSON.parse(document.getElementById('covers').textContent), n = covers.length;
+    var st = q.get('start'); st = (st != null && covers[+st]) ? +st : Math.floor(Math.random() * n);
+    window.__start = st;
+    var pre = new Image(); pre.src = covers[st].replace(/\.jpg$/, '_m.webp');
+  } catch (e) {}
   var mode = q.get('intro');
   if (mode === '0' || mode === 'off') { resolve(); return; }
 

@@ -53,16 +53,17 @@ body::-webkit-scrollbar { display: none; }
 .overlay { transition: opacity .75s ease-out; }
 html.intro .overlay { opacity: 0; pointer-events: none; }
 html.intro .overlay > * { pointer-events: none; }
+html.intro .metro { opacity: 0; pointer-events: none; }
 
 /* ═══ the mark: the square turns, the word stays level ═══
    It turns with the motion (steady on auto-drift, fast on a quick scroll);
    a click opens the write-up, and the sheet grows out of it. */
 .metro {
-  position: absolute; left: var(--sl); top: var(--st);
+  position: fixed; left: var(--sl); top: var(--st);
   width: var(--ms); height: var(--ms);
-  z-index: 11;
+  z-index: 40;   /* above the overlay (10) and the Works bed (30): top left on every screen */
   display: grid; place-items: center;
-  transform-origin: center; transition: transform .2s ease-out;
+  transform-origin: center; transition: transform .2s ease-out, opacity .75s ease-out;
   user-select: none; -webkit-user-select: none;
 }
 .metro .sq { position: absolute; inset: 0; background: var(--ink); will-change: transform; transition: background .3s ease-out; }

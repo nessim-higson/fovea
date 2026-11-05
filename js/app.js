@@ -11,18 +11,17 @@
 //   transition).
 // ═══════════════════════════════════════════════════════════════════
 import * as THREE from 'three';
-import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=53';
-import { initAbout } from './about.js?v=53';
+import { initWorksBed } from './worksbed.js?v=54';
+import { initAbout } from './about.js?v=54';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=53'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=54'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -168,6 +167,7 @@ function loadMedia(src, holder, done = () => {}) {
     // downscale on load — the source art is ~1800px; full-size textures
     // exhaust GPU memory on phones. Cap the longest edge, keep the aspect.
     const img = new Image(); img.crossOrigin = 'anonymous'; img.decoding = 'async';
+    const webp = /\.jpg$/i.test(src) ? src.replace(/\.jpg$/i, '_m.webp') : null;   // the 1400 px WebP, a third of the JPEG's bytes
     img.onload = () => (img.decode ? img.decode().catch(() => {}) : Promise.resolve()).then(() => {   // decode off the main thread first
       const MAX = COARSE ? 1000 : 1600, nw = img.naturalWidth, nh = img.naturalHeight;
       let w = nw, h = nh;
@@ -181,8 +181,8 @@ function loadMedia(src, holder, done = () => {}) {
       holder.landed = performance.now();   // fades up from black over 500 ms (the frame loop)
       fin();
     });
-    img.onerror = fin;
-    img.src = src;
+    img.onerror = () => { if (webp && img.src.endsWith('_m.webp')) { img.src = src; } else fin(); };   // no WebP there: the JPEG
+    img.src = webp || src;
   }
 }
 
@@ -482,7 +482,8 @@ layout();
 window.addEventListener('resize', layout);
 // land on a different project each visit (V.46): the loop is seamless, so any
 // start is as good as the first. ?start=<n> pins one for checks.
-const START = (() => { const q = new URLSearchParams(location.search).get('start');
+const START = (() => { if (window.__start != null && PROJECTS[window.__start]) return window.__start;   // chosen by the opening, cover already on its way
+  const q = new URLSearchParams(location.search).get('start');
   return q != null && PROJECTS[+q] ? +q : Math.floor(Math.random() * PROJECTS.length); })();
 window.scrollTo(0, Math.floor(LOOPS / 2) * cycleH() + START * VH);
 // load the covers nearest the landing first, then outward both ways round the loop
@@ -578,10 +579,11 @@ const about = initAbout({
   variant: QS.get('about') || 'wipe',      // how the sheet comes in — the drop from the top, on a spring (Ness, V.50)
   exit: QS.get('out') || 'fade',           // how it goes out (?out=reverse|fade|lift|sweep|turn) — fade, Ness's pick
   drop: QS.get('drop') || 'soft',          // the drop's tempo (?drop=quick|soft|slow|slower) — soft, ω8 over 1.5 s
-  onOpen: () => { stopAuto(false); document.body.style.overflow = 'hidden'; turnMetro(90); },
-  onClose: () => { document.body.style.overflow = ''; turnMetro(90, 900); stopAuto(true); },
+  onOpen: () => { stopAuto(false); document.body.style.overflow = 'hidden'; document.body.classList.add('about-open'); turnMetro(90); },
+  onClose: () => { document.body.style.overflow = ''; document.body.classList.remove('about-open'); turnMetro(90, 900); stopAuto(true); },
 });
-metroEl.addEventListener('click', () => { if (!worksBedOpen()) about.toggle(); });
+// the mark: the write-up on the landing and inside a project; on the Works bed it is the way home
+metroEl.addEventListener('click', () => { if (worksBedOpen()) worksBed.close(); else about.toggle(); });
 
 for (const ev of ['wheel', 'touchstart']) {
   window.addEventListener(ev, () => { casePinTop = false; stopAuto(); }, { passive: true });
@@ -810,18 +812,19 @@ function updateNav() {
   } else { lastViewIdx = -2; }
 }
 
-/* ── GUI panel ─────────────────────────────────────────────────────── */
-const gui = new GUI({ title: 'EFFECTS' });
-gui.hide();
-let guiVisible = false;
-window.addEventListener('keydown', (e) => {
+/* ── GUI panel — lil-gui is fetched the first time G is pressed (V.54), not on every visit ── */
+let gui = null, guiVisible = false;
+const sel = { effect: SETTINGS.effect };
+window.addEventListener('keydown', async (e) => {
   if (e.key.toLowerCase() === 'g' && !e.metaKey && !e.ctrlKey) {
+    if (!gui) { const { default: GUI } = await import('lil-gui'); buildGui(GUI); }
     guiVisible = !guiVisible;
     guiVisible ? gui.show() : gui.hide();
   }
 });
-
-const sel = { effect: SETTINGS.effect };
+function buildGui(GUI) {
+gui = new GUI({ title: 'EFFECTS' });
+gui.hide();
 gui.add(sel, 'effect', Object.keys(EFFECTS)).name('Pass').onChange(setEffect);
 gui.add(ui, 'lens').name('Lens (route demo)').onChange(v => setLens(v));
 gui.add(ui, 'ghost').name('Ghost images').onChange(v => {
@@ -845,9 +848,12 @@ beatFolder.add(SETTINGS, 'bpm', 20, 240, 1).name('BPM (60 = secs)');
 beatFolder.add(SETTINGS, 'beatAmount', 0, 3, 0.05).name('Pulse');
 beatFolder.add(SETTINGS, 'beatSharp', 1, 10, 0.5).name('Sharpness');
 beatFolder.add(SETTINGS, 'beatStep', 0, 400, 5).name('Tick step (px)');
+rebuildParamsFolder();
+}
 
 let paramsFolder = null;
 function rebuildParamsFolder() {
+  if (!gui) return;
   if (paramsFolder) paramsFolder.destroy();
   paramsFolder = gui.addFolder(EFFECTS[activeEffect].name);
   for (const p of EFFECTS[activeEffect].params) {
@@ -871,6 +877,7 @@ window.__closeDetail = closeDetail;
 window.__about = about;
 window.__vh = () => [VW, VH, smooth, window.scrollY];   // for checks: the layout's idea of the viewport and the loop position
 window.__layout = layout;
+window.__bed = worksBed;
 window.__audio = audio;
 window.__state = state;
 window.__vel = () => userVel;
