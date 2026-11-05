@@ -91,7 +91,7 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
-  const CATS = [...new Set(projects.map(p => p.category || 'Work'))];
+  const CATS = ['Work'];   // one field, no Commercial / Personal split (V.39)
   let activeCat = CATS[0];
   let list = [], ox = 0, oy = 0, pox = 0, poy = 0, vel = 0, t0 = 0, running = false;
   let zoom = 0, zoomTarget = 0, zoomC = [0.5, 0.5], diveActive = false;
@@ -112,7 +112,6 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
     // tiles actually drawn pull a texture), so the pool can be large cheaply.
     list = [];
     projects.forEach((p, gi) => {
-      if ((p.category || 'Work') !== activeCat) return;
       const imgs = (p.images && p.images.length ? p.images : [coverOf(p)]).filter(u => !isVid(u));
       imgs.forEach(src => list.push({ p, gi, src: src.replace(/\.jpg$/i, '_t.jpg') }));   // fast thumbnail
     });
@@ -207,7 +206,6 @@ export function initWorksBed({ container, projects, onEnter, isPlaying }) {
   addEventListener('resize', () => { if (running) { const dpr = Math.min(COARSE ? 1.25 : 2, devicePixelRatio || 1); cv.width = W() * dpr; cv.height = H() * dpr; makeFBO(); } });
 
   function open(startGlobal) {
-    if (startGlobal != null && projects[startGlobal]) activeCat = projects[startGlobal].category || 'Work';
     container.hidden = false; document.body.style.overflow = 'hidden';   // freeze the page behind
     const dpr = Math.min(COARSE ? 1.25 : 2, devicePixelRatio || 1); cv.width = W() * dpr; cv.height = H() * dpr; makeFBO();
     setCat(startGlobal);

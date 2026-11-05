@@ -73,8 +73,8 @@ html.intro .overlay > * { pointer-events: none; }
 }
 @media (hover: hover) { .metro:hover { transform: scale(.95); } }
 /* on the sheet the mark is ink on paper: the square goes black, the word stays readable */
-.about-open .metro .sq { background: #111; }
-.about-open .metro span { color: #f4f4f1; }
+.about-open .metro .sq { background: #151514; }
+.about-open .metro span { color: #ecece8; }
 
 /* ═══ the navigation: words with a hairline round them, no box. The colour
    follows the imagery under each word (app.js samples the canvas): light on
@@ -83,11 +83,12 @@ html.intro .overlay > * { pointer-events: none; }
   display: inline-flex; align-items: center; justify-content: center;
   height: 32px; padding: 0 10px;
   font-size: 11px; line-height: 1; letter-spacing: .02em; white-space: nowrap;
-  color: var(--ink); background: transparent; border: 1px solid rgba(236, 236, 232, .45);
+  color: var(--ink); background: transparent; border: 1px solid rgba(236, 236, 232, .28); border-radius: 999px;
+  padding: 0 13px;
   transition: color .45s ease-out, border-color .45s ease-out, opacity .3s ease-out;
 }
-.nav.dark { color: #111; border-color: rgba(17, 17, 17, .4); }
-@media (hover: hover) { .nav:hover, .wb-close:hover, .wb-toggle button:hover { border-color: currentColor; } }
+.nav.dark { color: #111; border-color: rgba(17, 17, 17, .22); }
+@media (hover: hover) { .nav:hover, .wb-close:hover, .wb-toggle button:hover { border-color: rgba(236, 236, 232, .6); } .nav.dark:hover { border-color: rgba(17, 17, 17, .5); } }
 @media (max-width: 759px) { .nav, .index-btn, .sound-btn, .view-btn, .about-x, .detail-x, .wb-close, .wb-toggle button { height: 40px; } }
 
 /* top-right: Close (inside a project) · Works */
@@ -97,8 +98,7 @@ html.intro .overlay > * { pointer-events: none; }
 .sound-btn { position: absolute; right: var(--sr); bottom: var(--sb); }
 .sound-btn.on::before { content: ''; width: 6px; height: 6px; margin-right: 8px; background: currentColor; }
 /* View — dive into the project in view, straight from the landing — bottom centre */
-.view-btn { position: absolute; left: 50%; bottom: var(--sb); transform: translateX(-50%); }
-.view-btn[hidden] { display: none; }
+.view-btn { display: none; }   /* the cover itself is the way in (V.39) */
 
 /* ═══ the opening (js/intro.js, from tempo study A1) ═══ */
 .intro-layer { position: fixed; inset: 0; z-index: 50; overflow: hidden; cursor: pointer; }
@@ -118,7 +118,7 @@ html.intro .overlay > * { pointer-events: none; }
 /* ═══ the write-up: a sheet of paper that grows out of the mark (js/about.js, from tempo study B1) ═══
    The sheet runs on the light tokens: paper on paper, ink #111, the contact line in mute. */
 .about {
-  --paper: #f4f4f1; --ink: #111; --mute: #80807a; --faint: #b3b3ad; --line: #e1e1dc; --rule: #d2d2cc;
+  --paper: #ecece8; --ink: #151514; --mute: rgba(21, 21, 20, .6);
   position: absolute; inset: 0; z-index: 5; pointer-events: none; overflow: hidden;
   will-change: transform, opacity, clip-path;
 }
@@ -136,8 +136,7 @@ html.intro .overlay > * { pointer-events: none; }
 .about-info .ct a { color: var(--mute); }
 .about-info .ct a:hover { color: var(--ink); }
 .about-info .ln { opacity: 0; will-change: transform, opacity; }
-.about-x { position: absolute; right: var(--sr); top: var(--st); opacity: 0; color: var(--ink); border-color: rgba(17, 17, 17, .4); }
-.about.on .about-x { opacity: 1; }
+.about-x { display: none; }   /* the mark or Esc closes it, as in the study */
 @media (max-width: 759px) {
   .about-info { left: var(--sl); right: var(--sr); top: calc(var(--st) + var(--ms) + 36px); transform: none; width: auto; }
 }
@@ -149,7 +148,7 @@ html.intro .overlay > * { pointer-events: none; }
   opacity: 0; transition: opacity .6s ease-out;
 }
 body.in-project .scrim { opacity: 1; }
-.detail { position: absolute; left: var(--sl); bottom: var(--sb); max-width: 48ch; color: var(--mute); }
+.detail { position: absolute; left: var(--sl); bottom: var(--sb); max-width: 44ch; font-size: 11px; line-height: 1.45; color: var(--mute); }
 .detail[hidden] { display: none; }
 .detail-meta { display: block; font-weight: 500; color: var(--ink); }
 .detail-desc { margin-top: 0; }
