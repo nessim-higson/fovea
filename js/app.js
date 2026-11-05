@@ -15,14 +15,14 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=48';
-import { initAbout } from './about.js?v=48';
+import { initWorksBed } from './worksbed.js?v=49';
+import { initAbout } from './about.js?v=49';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=48'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=49'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -46,7 +46,7 @@ let detailIdx = -1;
 const renderer = new THREE.WebGLRenderer({
   canvas: document.getElementById('gl'), antialias: true,
 });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, COARSE ? 1.5 : 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, COARSE ? 1.25 : 2));   // a phone's lens pass at 1.25 (V.49: was 1.5 — the load stuttered)
 
 let VW = 0, VH = 0;   // set by layout() (which runs immediately below)
 
@@ -113,7 +113,7 @@ const VIDEO_RE = /\.(mp4|m4v|webm|mov)(\?.*)?$/i;
 // the loader queue (V.48): nothing loads all at once. Three at a time, in the
 // order they are wanted — the landing project first, then its neighbours either
 // way round the loop, then the rest; a project's images in order, ahead of the queue.
-const loadQueue = []; let loadsLive = 0; const LOADS_AT_ONCE = 3;
+const loadQueue = []; let loadsLive = 0; const LOADS_AT_ONCE = COARSE ? 1 : 3;   // a phone takes one at a time: decode + GPU upload is where the load lag was
 function pumpLoads() {
   while (loadsLive < LOADS_AT_ONCE && loadQueue.length) {
     const { src, holder } = loadQueue.shift();
@@ -167,9 +167,9 @@ function loadMedia(src, holder, done = () => {}) {
   } else {
     // downscale on load — the source art is ~1800px; full-size textures
     // exhaust GPU memory on phones. Cap the longest edge, keep the aspect.
-    const img = new Image(); img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const MAX = COARSE ? 1100 : 1600, nw = img.naturalWidth, nh = img.naturalHeight;
+    const img = new Image(); img.crossOrigin = 'anonymous'; img.decoding = 'async';
+    img.onload = () => (img.decode ? img.decode().catch(() => {}) : Promise.resolve()).then(() => {   // decode off the main thread first
+      const MAX = COARSE ? 1000 : 1600, nw = img.naturalWidth, nh = img.naturalHeight;
       let w = nw, h = nh;
       if (Math.max(w, h) > MAX) { const s = MAX / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
       const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -179,7 +179,7 @@ function loadMedia(src, holder, done = () => {}) {
       holder.mat.uniforms.map.value = t;
       holder.imgW = nw; holder.imgH = nh; holder.fit();
       fin();
-    };
+    });
     img.onerror = fin;
     img.src = src;
   }
@@ -468,10 +468,13 @@ const START = (() => { const q = new URLSearchParams(location.search).get('start
 window.scrollTo(0, Math.floor(LOOPS / 2) * cycleH() + START * VH);
 // load the covers nearest the landing first, then outward both ways round the loop
 { const n = PROJECTS.length;
-  for (let d = 0; d <= n / 2; d++) for (const i of d ? [(START + d) % n, (START - d + n) % n] : [START]) {
+  const ring = (from, to) => { for (let d = from; d <= to; d++) for (const i of d ? [(START + d) % n, (START - d + n) % n] : [START]) {
     if (i < 0 || i >= n || slides[i].queued || !PROJECTS[i].image) continue;
     slides[i].queued = true; queueLoad(PROJECTS[i].image, slides[i]);
-  } }
+  } };
+  ring(0, 1);   // the landing cover and its two neighbours, now
+  (window.__intro || Promise.resolve()).then(() => setTimeout(() => ring(2, Math.ceil(n / 2)), COARSE ? 1500 : 300));   // the rest, after the opening has settled
+}
 
 let smooth = window.scrollY, lastSmooth = smooth, scrollDif = 0;
 // velocity that drives the distortion is computed from USER scroll only —
@@ -1002,7 +1005,7 @@ function frame(now) {
   }
 
   updateNav();
-  if ((++navTick & 7) === 0) sampleNav();   // every 8th frame, straight after the draw (before the buffer goes)
+  if ((++navTick % NAV_EVERY) === 0) sampleNav();   // straight after the draw (before the buffer goes); a readback stalls the GPU, so rarely on a phone
   requestAnimationFrame(frame);
 }
 
@@ -1010,7 +1013,7 @@ function frame(now) {
    just drawn under each word and flip it ink / paper with some hysteresis ── */
 const navEls = [...document.querySelectorAll('.nav')];
 const navBuf = new Uint8Array(8 * 8 * 4);
-let navTick = 0;
+let navTick = 0; const NAV_EVERY = COARSE ? 30 : 8;
 function sampleNav() {
   const gl = renderer.getContext(), pr = renderer.getPixelRatio();
   const cw = gl.drawingBufferWidth, ch = gl.drawingBufferHeight;

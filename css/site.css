@@ -107,7 +107,8 @@ html.intro .overlay > * { pointer-events: none; }
 .sound-btn.on::before { content: ''; width: 6px; height: 6px; margin-right: 8px; background: currentColor; }
 /* View — dive into the project in view, straight from the landing — bottom centre */
 /* the project's title, bottom centre, in sentence case: the way in besides the cover itself — the word alone, no hairline */
-.view-btn { position: absolute; left: 50%; bottom: var(--sb); transform: translateX(-50%); border-color: transparent; }
+.view-btn { position: absolute; left: 50%; bottom: var(--sb); transform: translateX(-50%); border-color: rgba(236, 236, 232, .16); }   /* a faint stroke: it is a thing to press */
+.view-btn.dark { border-color: rgba(17, 17, 17, .14); }
 .view-btn[hidden] { display: none; }
 
 /* ═══ the opening (js/intro.js, from tempo study A1) ═══ */

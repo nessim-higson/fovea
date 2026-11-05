@@ -1,6 +1,12 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.48 — LIVE on https://iamalwayshungry.com**
+_Last updated: 2026-11-05_ · **V.49 — LIVE on https://iamalwayshungry.com**
+
+V.49: the phone's load lag — a phone now renders at 1.25× (was 1.5), loads one cover at a time (desktop
+three), decodes each image off the main thread (`img.decode()`) before the canvas scale, caps covers at
+1000 px, loads only the landing cover and its two neighbours before the opening has run (the rest 1.5 s
+after), and samples the nav colour every 30th frame (the readback stalls the GPU; desktop every 8th).
+The title word under the landing has a faint stroke again (.16 alpha) so it reads as a thing to press.
 
 V.48 (evening): **the Works bed glides on touch** — the finger's velocity over its last 100 ms carries on
 after the lift and decays at 0.998/ms (iOS's normal rate, capped at 4 px/ms), a finger or a wheel stops it
