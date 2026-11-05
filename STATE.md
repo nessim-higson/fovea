@@ -1,6 +1,9 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.41 — the IAAH launch build, on lab as FOVEA V.2**
+_Last updated: 2026-11-05_ · **V.42 — the IAAH launch build, on lab as FOVEA V.2**
+
+V.42: the mark is 67 px (53 on a phone), its word 13 px like the site's type; the title word under the
+landing and the bed's caption lose their hairline (the word alone).
 
 V.41: the Works bed's hint line is gone; its caption is a sentence-case pill at the nav size, bottom
 centre, like the title word on the landing; Sound moved up into the top row beside Works (Close ·

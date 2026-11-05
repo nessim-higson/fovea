@@ -12,14 +12,14 @@
   --paper: #151514; --ink: #ecece8; --mute: #8d8d87; --faint: #55554f; --line: #262624; --rule: #2e2e2b;
   --sans: "Helvetica Neue", HelveticaNeue, Helvetica, Arial, sans-serif;
   --ease: cubic-bezier(.65, 0, .35, 1);
-  --ms: 56px;                                              /* the mark's side */
+  --ms: 67px;                                              /* the mark's side (56 × 1.2, V.42) */
   --sl: max(24px, env(safe-area-inset-left, 0px));         /* the page's insets */
   --sr: max(24px, env(safe-area-inset-right, 0px));
   --st: max(22px, env(safe-area-inset-top, 0px));
   --sb: max(20px, env(safe-area-inset-bottom, 0px));
 }
 @media (max-width: 759px) {
-  :root { --ms: 44px; --sl: max(16px, env(safe-area-inset-left, 0px)); --sr: max(16px, env(safe-area-inset-right, 0px)); --st: max(16px, env(safe-area-inset-top, 0px)); --sb: max(16px, env(safe-area-inset-bottom, 0px)); }
+  :root { --ms: 53px; --sl: max(16px, env(safe-area-inset-left, 0px)); --sr: max(16px, env(safe-area-inset-right, 0px)); --st: max(16px, env(safe-area-inset-top, 0px)); --sb: max(16px, env(safe-area-inset-bottom, 0px)); }
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -68,7 +68,7 @@ html.intro .overlay > * { pointer-events: none; }
 .metro .sq { position: absolute; inset: 0; background: var(--ink); will-change: transform; transition: background .3s ease-out; }
 .metro span {
   position: relative; z-index: 1; pointer-events: none;
-  color: var(--paper); font-weight: 700; font-size: max(11px, calc(var(--ms) * .23)); letter-spacing: .02em; line-height: 1;
+  color: var(--paper); font-weight: 700; font-size: 13px; letter-spacing: .02em; line-height: 1;   /* the site's own size */
   transition: color .3s ease-out;
 }
 @media (hover: hover) { .metro:hover { transform: scale(.95); } }
@@ -97,8 +97,8 @@ html.intro .overlay > * { pointer-events: none; }
 /* Sound sits in the top row with Works; a 6 px square marks it on */
 .sound-btn.on::before { content: ''; width: 6px; height: 6px; margin-right: 8px; background: currentColor; }
 /* View — dive into the project in view, straight from the landing — bottom centre */
-/* the project's title, bottom centre, in sentence case: the way in besides the cover itself */
-.view-btn { position: absolute; left: 50%; bottom: var(--sb); transform: translateX(-50%); }
+/* the project's title, bottom centre, in sentence case: the way in besides the cover itself — the word alone, no hairline */
+.view-btn { position: absolute; left: 50%; bottom: var(--sb); transform: translateX(-50%); border-color: transparent; }
 .view-btn[hidden] { display: none; }
 
 /* ═══ the opening (js/intro.js, from tempo study A1) ═══ */
@@ -169,7 +169,7 @@ body.in-project .scrim { opacity: 1; }
 .wb-cap {
   position: absolute; left: 50%; bottom: var(--sb); transform: translateX(-50%); z-index: 6; pointer-events: none;
   display: inline-flex; align-items: center; height: 32px; padding: 0 13px;
-  font-size: 11px; line-height: 1; letter-spacing: .02em; color: var(--ink); border: 1px solid rgba(236, 236, 232, .28); border-radius: 999px;
+  font-size: 11px; line-height: 1; letter-spacing: .02em; color: var(--ink);
   opacity: 0; transition: opacity .25s; white-space: nowrap;
 }
 .wb-cap .yr { margin-left: 8px; color: var(--mute); font-variant-numeric: tabular-nums; }
