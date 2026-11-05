@@ -1,6 +1,25 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.38 — the IAAH launch build: the nav as words** (branch `iaah-launch`, merged to `main`; GitHub Pages deploys from `main`).
+_Last updated: 2026-11-05_ · **V.39 — the IAAH launch build, on lab as FOVEA V.2** (branch `iaah-launch`, merged to `main`; GitHub Pages deploys from `main`).
+
+## V.39 — pills, no View, the sheet as the study, one Works field, the original frozen (2026-11-05, evening)
+
+Ness, on V.38, in a hurry: save this as a version on lab as **FOVEA V.2** and preserve the original;
+rounded, quieter hairlines ("sophisticated buttons"); no button under a project; the project copy
+at the label's size; the about exactly as the B1 study's screenshot; Works with no Commercial /
+Personal split.
+
+- **On lab, via the shares pipeline** (`~/CLAUDE/projects/shares/share.sh`'s Pages project, no gate change):
+  https://lab.iamalwayshungry.com/s/fovea-v2/ = this build (V.39), https://lab.iamalwayshungry.com/s/fovea-v1/
+  = the original V.35 of 2026-07-02. Both carry their own `content/`. The original is also frozen in
+  the repo at `/v35.0/` (the snapshot convention: code only, `../content/`), live at
+  nessim-higson.github.io/fovea/v35.0/.
+- **Pills**: `.nav` is a 999px-radius hairline at .28 alpha (.22 ink on light imagery), 13px side
+  padding. **No View word**: the cover itself (and Works) is the way in; the button is `display:none`.
+- **The project copy** sets at 11/1.45 like the studies' label (44ch; full width on a phone).
+- **The sheet is the study's own dark-theme look**: `#ecece8` paper, `#151514` type, the contact
+  line at .6; no Close word (the mark or Esc closes it); the returns and the Instagram line stay.
+- **Works is one field**: `CATS = ['Work']`, no category filter, no toggle.
 
 ## V.38 — the nav as words, Sound back, the project scrim (2026-11-05, later still)
 
