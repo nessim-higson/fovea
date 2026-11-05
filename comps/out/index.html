@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>IAAH · Out · the way out</title>
+<link rel="stylesheet" href="../../css/site.css?v=37">
+<link rel="stylesheet" href="../_comps.css?v=37">
+</head>
+<body>
+<div class="mkp">IAAH</div>
+<h1>Out · how the sheet comes out</h1>
+<p class="lede">Five ways the write-up's sheet leaves and the work comes back. Every frame starts with the sheet up (the Square way in) and closes by itself once; after that, click the mark to open it again (Square) and close it the frame's way. Closes run at .6 of the opens, after the studies. The live site takes any with <code>?out=reverse</code> … <code>?out=turn</code>, with any way in. Reverse ships unless you say otherwise. <a href="../grow/">The way in →</a></p>
+<div class="grid" id="grid"></div>
+
+<script type="module">
+import { initAbout, EXITS } from '../../js/about.js?v=37';
+const NOTES = {
+  reverse: ['Reverse', 'The way in run backwards: the type falls, the sheet shrinks back into the mark. The studies’ rule.'],
+  fade:    ['Fade', 'The type falls, then the whole sheet fades off in place over .45 s; the work is simply there again.'],
+  lift:    ['Lift', 'The sheet lifts off the top of the screen, type and all, like a page turned up; the work is under it.'],
+  sweep:   ['Sweep', 'The sheet is swept off to the right, its left edge uncovering the work; the type goes with it.'],
+  turn:    ['Turn', 'The type falls, then the sheet turns a quarter back and shrinks into the mark, fading as it lands.'],
+};
+const STILLS = ['katla/02.jpg', 'queens-gambit/02.jpg', 'griselda/02.jpg', 'grand-army/02.jpg', 'finestkind/02.jpg'];
+const grid = document.getElementById('grid');
+EXITS.forEach((v, i) => {
+  const fig = document.createElement('figure');
+  fig.innerHTML = `<div class="frame"><img class="still" src="../../content/iaah/${STILLS[i]}" alt="">
+  <div class="overlay">
+    <button class="metro"><i class="sq"></i><span>IAAH</span></button>
+    <div class="top"><button class="about-btn">About</button><button class="index-btn">Works</button></div>
+  </div></div>
+  <figcaption><span class="no">O${i + 1}</span><span><span class="t">${NOTES[v][0]}</span><span class="n">${NOTES[v][1]} <a href="../../?out=${v}&intro=0" target="_blank">See it live →</a></span></span></figcaption>`;
+  grid.appendChild(fig);
+  const f = fig.querySelector('.frame'), ov = f.querySelector('.overlay'), mark = ov.querySelector('.metro'), sq = mark.querySelector('.sq');
+  let deg = 90;
+  const turn = (ms) => { const from = deg; deg += 90; sq.animate([{ transform: `rotate(${from}deg)` }, { transform: `rotate(${deg}deg)` }], { duration: ms, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards' }); };
+  sq.style.transform = 'rotate(90deg)';
+  const a = initAbout({ host: ov, mark, variant: 'square', exit: v, onOpen: () => turn(1500), onClose: () => turn(900) });
+  mark.addEventListener('click', () => a.toggle());
+  ov.querySelector('.about-btn').addEventListener('click', () => a.open());
+  requestAnimationFrame(() => a.open(true));
+  setTimeout(() => a.close(), 1600 + i * 900);
+});
+</script>
+</body>
+</html>

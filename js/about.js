@@ -1,13 +1,14 @@
 // ═══════════════════════════════════════════════════════════════════
-// ABOUT — the write-up on a white sheet that comes in from the mark.
+// ABOUT — the write-up on a sheet of paper that comes in from the mark.
 // Ported from tempo study B1 (Grow): the mark's own square grows until it
-// is the screen and the write-up sets on it, ink on paper; the close is the
-// open run backwards at .6 of the time. Five ways in (GROWS): square,
-// circle, wipe, turn, scrim. One ease: cubic-bezier(.65,0,.35,1).
+// is the screen and the write-up sets on it, ink on paper. Five ways in
+// (GROWS) and five ways out (EXITS); the close runs at .6 of the open.
+// One ease: cubic-bezier(.65,0,.35,1).
 //
-// initAbout({ host, mark, variant, onOpen, onClose }) builds the sheet
-// into `host` (under the mark in DOM order, so the mark stays on top) and
-// measures `mark` by its offsets, so the same module runs the comps frames.
+// initAbout({ host, mark, variant, exit, onOpen, onClose }) builds the
+// sheet into `host` (under the mark in DOM order, so the mark stays on
+// top) and measures `mark` by its offsets, so the same module runs the
+// comps frames.
 // ═══════════════════════════════════════════════════════════════════
 
 export const ABOUT = {
@@ -23,10 +24,12 @@ export const ABOUT = {
 };
 
 export const GROWS = ['square', 'circle', 'wipe', 'turn', 'scrim'];
+export const EXITS = ['reverse', 'fade', 'lift', 'sweep', 'turn'];
 const EASE = 'cubic-bezier(.65,0,.35,1)';
 
-export function initAbout({ host, mark, variant = 'square', onOpen, onClose }) {
+export function initAbout({ host, mark, variant = 'square', exit = 'reverse', onOpen, onClose }) {
   if (!GROWS.includes(variant)) variant = 'square';
+  if (!EXITS.includes(exit)) exit = 'reverse';
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
   const root = el('div', 'about');
@@ -53,7 +56,7 @@ export function initAbout({ host, mark, variant = 'square', onOpen, onClose }) {
     const side = Math.max(w, h), diag = Math.hypot(w, h) + 2;
     return { w, h, ms, mx, my, cx: w / 2, cy: h / 2, side, diag, mcx: mx + ms / 2, mcy: my + ms / 2 };
   }
-  // the sheet's rest and cover states per variant
+  // the sheet's rest and cover states per way in
   function states() {
     const g = geo();
     sheet.classList.toggle('full', variant === 'circle' || variant === 'wipe' || variant === 'scrim');
@@ -81,6 +84,7 @@ export function initAbout({ host, mark, variant = 'square', onOpen, onClose }) {
     const s = states();
     sheet.style.transform = s.from.transform || ''; sheet.style.clipPath = s.from.clipPath || '';
     sheet.style.opacity = variant === 'scrim' ? 0 : '';
+    root.style.transform = ''; root.style.opacity = ''; root.style.clipPath = ''; root.style.transformOrigin = '';
   }
   rest();
 
@@ -90,13 +94,14 @@ export function initAbout({ host, mark, variant = 'square', onOpen, onClose }) {
       anim(l, [{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 700, delay: at + k * 80, easing: EASE, fill: 'forwards' });
     });
   }
-  function fall() {
-    info.querySelectorAll('.ln').forEach(l => anim(l, [{ opacity: 1 }, { opacity: 0 }], { duration: 250, easing: 'ease-out', fill: 'forwards' }));
+  function fall(ms) {
+    info.querySelectorAll('.ln').forEach(l => anim(l, [{ opacity: 1 }, { opacity: 0 }], { duration: ms || 250, easing: 'ease-out', fill: 'forwards' }));
   }
 
   function show(instant) {
     if (open) return; open = true; cancel();
     const s = states();
+    rest();   // a close may have left the root moved
     root.classList.add('on'); host.classList.add('about-open');
     if (instant) {
       Object.assign(sheet.style, s.to); info.querySelectorAll('.ln').forEach(l => { l.style.opacity = 1; });
@@ -106,17 +111,44 @@ export function initAbout({ host, mark, variant = 'square', onOpen, onClose }) {
     }
     if (onOpen) onOpen();
   }
+
+  // the ways out. `reverse` runs the way in backwards on the sheet; the others
+  // take the whole page (sheet and type together) off, from wherever it is.
+  function leave() {
+    const s = states(), g = geo(), D = Math.round(s.ms * .6);
+    if (exit === 'reverse') {
+      fall();
+      return anim(sheet, [s.to, s.from], { duration: D, delay: 100, easing: EASE, fill: 'forwards' });
+    }
+    Object.assign(sheet.style, s.to);   // hold the sheet at cover while the root leaves
+    if (exit === 'fade') {
+      fall(200);
+      return anim(root, [{ opacity: 1 }, { opacity: 0 }], { duration: 450, delay: 120, easing: 'ease-out', fill: 'forwards' });
+    }
+    if (exit === 'lift') {
+      return anim(root, [{ transform: 'translateY(0)' }, { transform: 'translateY(-100%)' }], { duration: 660, easing: EASE, fill: 'forwards' });
+    }
+    if (exit === 'sweep') {
+      return anim(root, [{ clipPath: 'inset(0 0 0 0)' }, { clipPath: 'inset(0 0 0 100%)' }], { duration: 660, easing: EASE, fill: 'forwards' });
+    }
+    // turn: the sheet turns a quarter back and shrinks into the mark, the type falling first
+    fall(200);
+    root.style.transformOrigin = `${g.mcx}px ${g.mcy}px`;
+    return anim(root, [
+      { transform: 'rotate(0deg) scale(1)', opacity: 1, offset: 0 },
+      { opacity: 1, offset: .7 },
+      { transform: `rotate(-90deg) scale(${g.ms / g.side})`, opacity: 0, offset: 1 },
+    ], { duration: 780, delay: 100, easing: EASE, fill: 'forwards' });
+  }
   function hide() {
     if (!open) return; open = false; cancel();
-    const s = states();
     root.classList.remove('on'); host.classList.remove('about-open');
-    fall();
-    const a = anim(sheet, [s.to, s.from], { duration: Math.round(s.ms * .6), delay: 100, easing: EASE, fill: 'forwards' });
+    const a = leave();
     a.onfinish = () => { if (!open) { cancel(); rest(); } };
     if (onClose) onClose();
   }
   x.addEventListener('click', hide);
   addEventListener('resize', () => { if (!open) rest(); });
 
-  return { open: show, close: hide, toggle: () => (open ? hide() : show()), isOpen: () => open, variant, el: root };
+  return { open: show, close: hide, toggle: () => (open ? hide() : show()), isOpen: () => open, variant, exit, el: root };
 }

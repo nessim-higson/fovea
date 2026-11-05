@@ -1,24 +1,30 @@
-/* fovea · comps/_comps.css — the comps pages: a frame is a small screen (the site's own CSS runs inside it;
-   translateZ(0) keeps the site's fixed overlay to the frame) */
-body { background: #0a0a0a; color: #ecece8; font-family: var(--sans); font-size: 13px; font-weight: 400; letter-spacing: 0; line-height: 1.45; text-transform: none; -webkit-font-smoothing: antialiased; }
-.page { max-width: 1480px; margin: 0 auto; padding: 32px 24px 80px; }
-.page h1 { font-size: 13px; font-weight: 500; margin: 0 0 4px; }
-.page .lede { color: #8d8d87; max-width: 70ch; margin: 0 0 36px; }
-.page .lede a, .sec a.live { color: #ecece8; text-decoration: none; border-bottom: 1px solid #3a3a37; }
-.sec { margin: 0 0 48px; }
-.sec h2 { font-size: 13px; font-weight: 500; margin: 0 0 2px; }
-.sec h2 b { display: inline-block; width: 2.2em; font-weight: 700; }
-.sec .note { color: #8d8d87; max-width: 70ch; margin: 0 0 12px; }
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.frame { position: relative; overflow: hidden; aspect-ratio: 16 / 10; background: #000; transform: translateZ(0); border-radius: 4px; }
+/* fovea · comps/_comps.css — the comps pages, set like the tempo studies index: a frame is a small screen
+   (the site's own CSS runs inside it; translateZ(0) keeps the site's fixed overlay to the frame) */
+body { padding: var(--st) var(--sr) 60px var(--sl); }
+h1 { margin: 28px 0 0; font-size: 17px; font-weight: 500; letter-spacing: -.02em; line-height: 1.2; }
+.lede { margin: 10px 0 0; max-width: 60ch; color: var(--mute); }
+.lede a, .lede code { color: var(--ink); }
+.lede code { font: inherit; }
+h2 { margin: 44px 0 0; padding-bottom: 10px; font-size: 11px; font-weight: 400; color: var(--faint); letter-spacing: .04em; text-transform: uppercase; }
+.mkp { display: grid; place-items: center; width: var(--ms); height: var(--ms); background: var(--ink); color: var(--paper); font-weight: 700; font-size: max(11px, calc(var(--ms) * .23)); letter-spacing: .02em; line-height: 1; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 14px; max-width: 1480px; margin-top: 14px; }
+figure { margin: 0; }
+figcaption { display: grid; grid-template-columns: 3.2ch minmax(0, 1fr); column-gap: 12px; align-items: baseline; padding: 10px 0 0; max-width: 70ch; }
+figcaption .no { color: var(--faint); font-variant-numeric: tabular-nums; }
+figcaption .t { font-weight: 500; }
+figcaption .n { display: block; color: var(--mute); max-width: 60ch; }
+figcaption a { color: var(--faint); }
+figcaption a:hover { color: var(--ink); }
+.frame { position: relative; overflow: hidden; aspect-ratio: 16 / 10; background: #000; transform: translateZ(0); }
 .frame .still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .frame .overlay { position: absolute; }
-figure { margin: 0; }
-figcaption { padding: 8px 2px 0; font-size: 11px; line-height: 1.45; color: #8d8d87; }
-figcaption b { color: #ecece8; font-weight: 500; }
-figcaption a { color: #ecece8; text-decoration: none; border-bottom: 1px solid #3a3a37; }
-.frame .detail { bottom: 64px; }
-.frame .view-btn { bottom: 18px; }
-@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
 /* in a small frame the write-up sets under the mark, not centred, so the mark never covers its first line */
-.frame .about-info { top: calc(var(--sl) + var(--ms) + 28px); transform: translateX(-50%); }
+.frame .about-info { top: calc(var(--st) + var(--ms) + 28px); transform: translateX(-50%); }
+.rows { border-top: 1px solid var(--line); max-width: 80ch; }
+.r { display: grid; grid-template-columns: 3.2ch minmax(0, 1fr); column-gap: 12px; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--line); min-height: 44px; }
+.r .no { color: var(--faint); font-variant-numeric: tabular-nums; }
+.r .t { font-weight: 500; }
+.r .n { display: block; color: var(--mute); max-width: 60ch; }
+.r .v { display: block; color: var(--faint); margin-top: 2px; }
+@media (hover: hover) { .r:hover .t { text-decoration: underline; text-underline-offset: 3px; } }
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }

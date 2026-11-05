@@ -1,6 +1,26 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.36 — the IAAH launch build** (branch `iaah-launch`, merged to `main`; GitHub Pages deploys from `main`).
+_Last updated: 2026-11-05_ · **V.37 — the IAAH launch build, retyped** (branch `iaah-launch`, merged to `main`; GitHub Pages deploys from `main`).
+
+## V.37 — the studies' type, the turning square, the ways out (2026-11-05, later)
+
+Ness, on V.36: the B1 study's typeset, not the four comps; Helvetica handled as on the tempo studies
+index; the mark's word must stay readable (the square turns, the word stays level, the square goes
+black on the sheet); and studies of how the scrim comes *out*.
+
+- **One type system now** (`css/site.css` top): the tempo studies' tokens verbatim — Helvetica Neue
+  13/1.45 (15 on a phone), weights 400 and 500, sentence case, hairline `--line` rules, square 32 px
+  buttons (40 on a phone) in mute with a hairline, the mark 56 px at 24/22 (44 at 16/16), a 60ch
+  measure. Dark tokens for the chrome over the canvas, light (`#f4f4f1` paper, `#111` ink) on the
+  sheet. The a–d type comps and `?type=` are gone.
+- **The mark** is `<button class="metro"><i class="sq"></i><span>IAAH</span></button>`: `metroSq`
+  takes the rotation (scroll-driven and `turnMetro`), the word never turns. On the sheet the square
+  goes `#111`, the word `#f4f4f1`.
+- **Ways out** (`js/about.js` EXITS, `?out=reverse|fade|lift|sweep|turn`, comps at `comps/out/`):
+  reverse (the way in backwards, ships), fade, lift (off the top), sweep (off to the right), turn
+  (a quarter back into the mark). `comps/index.html` lists Grow and Out in the studies' row style.
+- The project card is the studies' label (a box of paper, bottom left, 11 px); View is the one
+  pressed button, bottom centre, "View Katla →" in sentence case (`titleCase` on the scraped names).
 
 ## V.36 — IAAH, for the time being (2026-11-05)
 

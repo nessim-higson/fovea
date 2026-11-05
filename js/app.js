@@ -15,14 +15,14 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=36';
-import { initAbout } from './about.js?v=36';
+import { initWorksBed } from './worksbed.js?v=37';
+import { initAbout } from './about.js?v=37';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=36'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=37'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -35,6 +35,7 @@ const metaEl   = document.getElementById('detail-meta');
 const descEl   = document.getElementById('detail-desc');
 const beatDot  = document.getElementById('beat-dot');
 const metroEl  = document.getElementById('metro');
+const metroSq  = document.getElementById('metro-sq');   // the square turns; the word stays level
 document.getElementById('metro-label').textContent = SITE.studio;
 
 // detail mode state (declared early — layout() runs at module load)
@@ -507,18 +508,20 @@ function stopAuto(resumable = true) {
 function turnMetro(deg = 90, ms = 1500) {
   const from = metroDeg, to = metroDeg + deg;
   metroDeg = ((to % 360) + 360) % 360;
-  const a = metroEl.animate([{ transform: `rotate(${from}deg)` }, { transform: `rotate(${to}deg)` }],
+  const a = metroSq.animate([{ transform: `rotate(${from}deg)` }, { transform: `rotate(${to}deg)` }],
     { duration: ms, easing: 'cubic-bezier(.65,0,.35,1)' });
-  a.onfinish = () => { metroEl.style.transform = 'rotate(' + metroDeg.toFixed(2) + 'deg)'; };
+  a.onfinish = () => { metroSq.style.transform = 'rotate(' + metroDeg.toFixed(2) + 'deg)'; };
 }
 
 /* ── the write-up: a white sheet that grows out of the mark (js/about.js) ──
    click the mark (or About) to open; the mark, Esc or Close to close. The
    drift pauses while it is up and resumes after. ?about=square|circle|wipe|turn|scrim */
+const QS = new URLSearchParams(location.search);
 const about = initAbout({
   host: document.querySelector('.overlay'),
   mark: metroEl,
-  variant: new URLSearchParams(location.search).get('about') || 'square',
+  variant: QS.get('about') || 'square',    // how the sheet comes in
+  exit: QS.get('out') || 'reverse',        // how it goes out (?out=reverse|fade|lift|sweep|turn)
   onOpen: () => { stopAuto(false); document.body.style.overflow = 'hidden'; turnMetro(90); },
   onClose: () => { document.body.style.overflow = ''; turnMetro(90, 900); stopAuto(true); },
 });
@@ -631,8 +634,7 @@ function fadeSwap(swapFn, fadeOut = 220, fadeIn = 700) {
 
 function populateCard(i) {
   const p = PROJECTS[i];
-  metaEl.textContent =
-    `${String(i + 1).padStart(2, '0')} · ${p.client} — ${p.title} · ${p.year}`;
+  metaEl.textContent = `${titleCase(p.client)} · ${p.title} · ${p.year}`;
   descEl.textContent = p.description || '';
 }
 
@@ -726,6 +728,8 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+// the chrome is sentence case; the scraped client names are shouted
+const titleCase = (t) => t.toLowerCase().replace(/(^|[\s(\-])([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\bIaah\b/g, 'IAAH').replace(/\bSqsp\b/g, 'SQSP').replace(/\bWetransfer\b/g, 'WeTransfer');
 let lastViewIdx = -2;
 function updateNav() {
   // the View button names the cover currently in view, on the landing only
@@ -733,7 +737,7 @@ function updateNav() {
   viewBtn.hidden = !onHome;
   if (onHome) {
     const i = currentIndex();
-    if (i !== lastViewIdx && PROJECTS[i]) { lastViewIdx = i; viewBtn.textContent = `View ${PROJECTS[i].client} ↗`; }
+    if (i !== lastViewIdx && PROJECTS[i]) { lastViewIdx = i; viewBtn.textContent = `View ${titleCase(PROJECTS[i].client)} →`; }
   } else { lastViewIdx = -2; }
 }
 
@@ -877,7 +881,7 @@ function frame(now) {
     const cap = METRO_MAX_DPS * dt / 1000;   // frame-rate independent speed limit
     const step = THREE.MathUtils.clamp(metroMove * rate, -cap, cap);
     metroDeg = (metroDeg + step) % 360;
-    metroEl.style.transform = 'rotate(' + metroDeg.toFixed(2) + 'deg)';
+    metroSq.style.transform = 'rotate(' + metroDeg.toFixed(2) + 'deg)';
   }
 
   const vel = THREE.MathUtils.clamp(

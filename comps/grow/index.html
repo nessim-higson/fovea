@@ -1,46 +1,42 @@
 <!DOCTYPE html>
-<html lang="en" data-type="b">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>IAAH · Grow comps · the write-up's sheet</title>
-<link rel="stylesheet" href="../../css/site.css?v=36">
-<link rel="stylesheet" href="../_comps.css?v=36">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>IAAH · Grow · the way in</title>
+<link rel="stylesheet" href="../../css/site.css?v=37">
+<link rel="stylesheet" href="../_comps.css?v=37">
 </head>
 <body>
-<div class="page">
-  <h1>IAAH · grow comps · how the white sheet comes in</h1>
-  <p class="lede">Five ways the write-up's sheet arrives from the mark, after tempo study B1 (Grow). Each frame opens by itself once; after that, click the mark (or Close) to run it again. The close is the open run backwards at .6 of the time; the mark turns a quarter as the sheet opens and again as it closes. The live site takes any of them with <code>?about=square</code> … <code>?about=scrim</code>. Square is what ships unless you say otherwise. <a href="../type/">Type comps →</a></p>
-
-  <div class="grid" id="grid"></div>
-</div>
+<div class="mkp">IAAH</div>
+<h1>Grow · how the sheet comes in</h1>
+<p class="lede">Five ways the write-up's sheet arrives from the mark, after tempo study B1 (Grow). Each frame opens by itself once; after that, click the mark (or Close) to run it again. The close here is the open run backwards at .6 of the time; the mark's square turns a quarter as the sheet opens and again as it closes, the word level throughout. The live site takes any with <code>?about=square</code> … <code>?about=scrim</code>. Square ships unless you say otherwise. <a href="../out/">The way out →</a></p>
+<div class="grid" id="grid"></div>
 
 <script type="module">
-import { initAbout, GROWS } from '../../js/about.js?v=36';
+import { initAbout, GROWS } from '../../js/about.js?v=37';
 const NOTES = {
   square: ['Square', 'The mark’s own square grows until it is the screen, level, from the corner. B1 as it stands.'],
   circle: ['Circle', 'A circle opens from the mark’s centre until it covers the screen; the mark stays where it is.'],
   wipe:   ['Wipe', 'The sheet comes down from the top edge, like a blind. The mark is on it from the first frame.'],
   turn:   ['Turn', 'The mark’s square grows and makes its quarter turn at once, so the sheet arrives as a turning square that settles level.'],
-  scrim:  ['Scrim', 'A white scrim fades up over the work in .8 s; nothing moves but the type rising. The quietest.'],
+  scrim:  ['Scrim', 'A scrim of paper fades up over the work in .8 s; nothing moves but the type rising. The quietest.'],
 };
 const STILLS = ['katla/01.jpg', 'queens-gambit/01.jpg', 'griselda/01.jpg', 'grand-army/01.jpg', 'finestkind/01.jpg'];
 const grid = document.getElementById('grid');
 GROWS.forEach((v, i) => {
   const fig = document.createElement('figure');
-  fig.innerHTML = `<div class="frame" data-type="b"><img class="still" src="../../content/iaah/${STILLS[i]}" alt="">
+  fig.innerHTML = `<div class="frame"><img class="still" src="../../content/iaah/${STILLS[i]}" alt="">
   <div class="overlay">
-    <button class="metro"><span>IAAH</span></button>
-    <button class="about-btn">About</button>
-    <button class="index-btn">Works</button>
+    <button class="metro"><i class="sq"></i><span>IAAH</span></button>
+    <div class="top"><button class="about-btn">About</button><button class="index-btn">Works</button></div>
   </div></div>
-  <figcaption><b>${NOTES[v][0]}</b> · ${NOTES[v][1]} · <a href="../../?about=${v}&intro=0" target="_blank">see it live</a></figcaption>`;
+  <figcaption><span class="no">G${i + 1}</span><span><span class="t">${NOTES[v][0]}</span><span class="n">${NOTES[v][1]} <a href="../../?about=${v}&intro=0" target="_blank">See it live →</a></span></span></figcaption>`;
   grid.appendChild(fig);
-  const f = fig.querySelector('.frame');
-  const ov = f.querySelector('.overlay'), mark = ov.querySelector('.metro');
+  const f = fig.querySelector('.frame'), ov = f.querySelector('.overlay'), mark = ov.querySelector('.metro'), sq = mark.querySelector('.sq');
   let deg = 0;
-  const turn = (ms) => { const from = deg; deg += 90; mark.animate([{ transform: `rotate(${from}deg)` }, { transform: `rotate(${deg}deg)` }], { duration: ms, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards' }); };
-  const a = initAbout({ host: ov, mark, variant: v, onOpen: () => { turn(1500); f.classList.add('about-open'); }, onClose: () => { turn(900); f.classList.remove('about-open'); } });
+  const turn = (ms) => { const from = deg; deg += 90; sq.animate([{ transform: `rotate(${from}deg)` }, { transform: `rotate(${deg}deg)` }], { duration: ms, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards' }); };
+  const a = initAbout({ host: ov, mark, variant: v, onOpen: () => turn(1500), onClose: () => turn(900) });
   mark.addEventListener('click', () => a.toggle());
   ov.querySelector('.about-btn').addEventListener('click', () => a.open());
   setTimeout(() => a.open(), 1400 + i * 700);

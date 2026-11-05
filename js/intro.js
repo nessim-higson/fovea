@@ -8,11 +8,10 @@
    A classic script so it starts before the modules (three.js from the CDN)
    land. window.__intro resolves when the work may arrive — app.js waits on it
    before fading the canvas up and starting the drift.
-   ?intro=0 skips it · ?intro=bare drops the name · ?type=a|b|c|d picks a type comp. */
+   ?intro=0 skips it · ?intro=bare drops the name. */
 (function () {
   'use strict';
   var q = new URLSearchParams(location.search);
-  var t = q.get('type'); if (t && /^[a-d]$/.test(t)) document.documentElement.dataset.type = t;
 
   var resolve, done = new Promise(function (r) { resolve = r; });
   window.__intro = done;
@@ -22,7 +21,8 @@
   var EASE = 'cubic-bezier(.65,0,.35,1)';
   var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   var root = document.documentElement, W = innerWidth, H = innerHeight, mobile = W < 760;
-  var MS = parseFloat(getComputedStyle(root).getPropertyValue('--ms')) || 68;
+  var MS = parseFloat(getComputedStyle(root).getPropertyValue('--ms')) || 56;
+  var markWord = document.querySelector('.metro span');
   root.classList.add('intro');
 
   function el(cls, text) { var e = document.createElement('div'); e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -34,8 +34,8 @@
   var ld = el('ld');
   ld.style.width = ld.style.height = side + 'px';
   ld.style.left = (W / 2 - side / 2) + 'px'; ld.style.top = (H / 2 - side / 2) + 'px';
-  var fin = 12, big = mobile ? 25 : W >= 1024 ? 74 : 42, ks = big / fin;
-  var ldw = el('ldw', 'IAAH');
+  var fin = markWord ? parseFloat(getComputedStyle(markWord).fontSize) : 13, big = mobile ? 25 : W >= 1024 ? 74 : 42, ks = big / fin;
+  var ldw = el('ldw', 'IAAH'); ldw.style.fontSize = fin + 'px';
   ldw.style.transform = 'translate(-50%,-50%) scale(' + ks + ')';
   layer.appendChild(ld); layer.appendChild(ldw);
   var nl = null, nr = null;
