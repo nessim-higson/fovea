@@ -1,6 +1,11 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.39 — the IAAH launch build, on lab as FOVEA V.2** (branch `iaah-launch`, merged to `main`; GitHub Pages deploys from `main`).
+_Last updated: 2026-11-05_ · **V.40 — the IAAH launch build, on lab as FOVEA V.2**
+
+V.40 (the same evening): the project's title is back bottom centre as a sentence-case word in the nav
+style (click = into the project); the project copy sits 16 px further in from the edges; the write-up
+column stays centred down to 600 px (the pane at 744 px used to get the phone layout); the sheet
+leaves by fading (`exit: 'fade'` is the default). (branch `iaah-launch`, merged to `main`; GitHub Pages deploys from `main`).
 
 ## V.39 — pills, no View, the sheet as the study, one Works field, the original frozen (2026-11-05, evening)
 

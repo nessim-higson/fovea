@@ -98,7 +98,9 @@ html.intro .overlay > * { pointer-events: none; }
 .sound-btn { position: absolute; right: var(--sr); bottom: var(--sb); }
 .sound-btn.on::before { content: ''; width: 6px; height: 6px; margin-right: 8px; background: currentColor; }
 /* View — dive into the project in view, straight from the landing — bottom centre */
-.view-btn { display: none; }   /* the cover itself is the way in (V.39) */
+/* the project's title, bottom centre, in sentence case: the way in besides the cover itself */
+.view-btn { position: absolute; left: 50%; bottom: var(--sb); transform: translateX(-50%); }
+.view-btn[hidden] { display: none; }
 
 /* ═══ the opening (js/intro.js, from tempo study A1) ═══ */
 .intro-layer { position: fixed; inset: 0; z-index: 50; overflow: hidden; cursor: pointer; }
@@ -137,7 +139,7 @@ html.intro .overlay > * { pointer-events: none; }
 .about-info .ct a:hover { color: var(--ink); }
 .about-info .ln { opacity: 0; will-change: transform, opacity; }
 .about-x { display: none; }   /* the mark or Esc closes it, as in the study */
-@media (max-width: 759px) {
+@media (max-width: 599px) {
   .about-info { left: var(--sl); right: var(--sr); top: calc(var(--st) + var(--ms) + 36px); transform: none; width: auto; }
 }
 
@@ -148,11 +150,11 @@ html.intro .overlay > * { pointer-events: none; }
   opacity: 0; transition: opacity .6s ease-out;
 }
 body.in-project .scrim { opacity: 1; }
-.detail { position: absolute; left: var(--sl); bottom: var(--sb); max-width: 44ch; font-size: 11px; line-height: 1.45; color: var(--mute); }
+.detail { position: absolute; left: calc(var(--sl) + 16px); bottom: calc(var(--sb) + 16px); max-width: 44ch; font-size: 11px; line-height: 1.45; color: var(--mute); }
 .detail[hidden] { display: none; }
 .detail-meta { display: block; font-weight: 500; color: var(--ink); }
 .detail-desc { margin-top: 0; }
-@media (max-width: 759px) { .detail { right: var(--sr); max-width: none; bottom: calc(var(--sb) + 52px); } }
+@media (max-width: 759px) { .detail { right: calc(var(--sr) + 16px); max-width: none; bottom: calc(var(--sb) + 60px); } }
 
 /* the rest of the controls stay hidden on the public site (V.36); the keyboard still works (G — effects panel) */
 .lens-btn, .hint, .version, .beat-dot { display: none; }
