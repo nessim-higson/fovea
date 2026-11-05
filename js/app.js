@@ -15,14 +15,14 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=37';
-import { initAbout } from './about.js?v=37';
+import { initWorksBed } from './worksbed.js?v=38';
+import { initAbout } from './about.js?v=38';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=37'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=38'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -526,7 +526,6 @@ const about = initAbout({
   onClose: () => { document.body.style.overflow = ''; turnMetro(90, 900); stopAuto(true); },
 });
 metroEl.addEventListener('click', () => { if (!worksBedOpen()) about.toggle(); });
-document.getElementById('about-btn').addEventListener('click', () => about.open());
 
 for (const ev of ['wheel', 'touchstart']) {
   window.addEventListener(ev, () => { casePinTop = false; stopAuto(); }, { passive: true });
@@ -574,7 +573,6 @@ const audio = createAudioEngine(SETTINGS);
 const soundBtn = document.getElementById('sound-btn');
 soundBtn.addEventListener('click', () => {
   const on = audio.toggle();
-  soundBtn.textContent = `Sound: ${on ? 'on' : 'off'}`;
   soundBtn.classList.toggle('on', on);
 });
 
@@ -644,7 +642,8 @@ function mountCase(i) {
   detailIdx = i;
   casePinTop = false;   // armed only after the snap below, so the build re-flow is quiet
   populateCard(i);
-  detailEl.hidden = false;
+  detailEl.hidden = false; detailX.hidden = false;
+  document.body.classList.add('in-project');
 
   const t = buildCaseTrack(i);   // just this project's images
   slides.forEach(s => s.mesh.visible = false);
@@ -704,7 +703,8 @@ function closeDetail() {
   fadeSwap(() => {
     detailOpen = false;
     detailIdx = -1;
-    detailEl.hidden = true;
+    detailEl.hidden = true; detailX.hidden = true;
+    document.body.classList.remove('in-project');
 
     disposeCaseTrack();
     slides.forEach(s => s.mesh.visible = true);
@@ -956,6 +956,30 @@ function frame(now) {
   }
 
   updateNav();
+  if ((++navTick & 7) === 0) sampleNav();   // every 8th frame, straight after the draw (before the buffer goes)
   requestAnimationFrame(frame);
+}
+
+/* ── the nav's colour follows the imagery: read a few pixels of the frame
+   just drawn under each word and flip it ink / paper with some hysteresis ── */
+const navEls = [...document.querySelectorAll('.nav')];
+const navBuf = new Uint8Array(8 * 8 * 4);
+let navTick = 0;
+function sampleNav() {
+  const gl = renderer.getContext(), pr = renderer.getPixelRatio();
+  const cw = gl.drawingBufferWidth, ch = gl.drawingBufferHeight;
+  for (const el of navEls) {
+    if (el.hidden) continue;
+    // inside a project the bottom words sit on the scrim, which the canvas can't see
+    if (detailOpen && el.classList.contains('sound-btn')) { el.classList.remove('dark'); continue; }
+    const r = el.getBoundingClientRect();
+    const x = Math.round((r.left + r.width / 2) * pr) - 4, y = Math.round((VH - (r.top + r.height / 2)) * pr) - 4;
+    if (x < 0 || y < 0 || x + 8 > cw || y + 8 > ch) continue;
+    gl.readPixels(x, y, 8, 8, gl.RGBA, gl.UNSIGNED_BYTE, navBuf);
+    let lum = 0;
+    for (let k = 0; k < navBuf.length; k += 4) lum += 0.2126 * navBuf[k] + 0.7152 * navBuf[k + 1] + 0.0722 * navBuf[k + 2];
+    lum /= (navBuf.length / 4) * 255;
+    if (lum > 0.6) el.classList.add('dark'); else if (lum < 0.42) el.classList.remove('dark');
+  }
 }
 requestAnimationFrame(frame);

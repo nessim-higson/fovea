@@ -1,6 +1,24 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.37 — the IAAH launch build, retyped** (branch `iaah-launch`, merged to `main`; GitHub Pages deploys from `main`).
+_Last updated: 2026-11-05_ · **V.38 — the IAAH launch build: the nav as words** (branch `iaah-launch`, merged to `main`; GitHub Pages deploys from `main`).
+
+## V.38 — the nav as words, Sound back, the project scrim (2026-11-05, later still)
+
+Ness, on V.37: no boxes on the nav; no About word (the mark is the about); the paper square showing
+behind the turning mark; Sound back; the nav words with a hairline round them, changing colour with
+the imagery; a scrim at the bottom of a project so the copy reads.
+
+- **The nav is words with a hairline** (`.nav` in `css/site.css`): transparent, 1 px rule at .45
+  alpha, 11 px. Works top right (Close joins it inside a project), View bottom centre, Sound bottom
+  right (a 6 px square marks it on). No About word; the mark opens the write-up.
+- **The colour follows the imagery**: `sampleNav()` in `app.js` reads 8×8 px of the frame just drawn
+  under each word (`gl.readPixels`, every 8th frame, before the buffer goes) and flips `.dark` with
+  hysteresis (ink above .6 luminance, paper below .42). Inside a project the bottom words sit on
+  the scrim, so Sound is forced light there.
+- **The sheet shows nothing at rest** (`visibility:hidden` in `about.js` `rest()`): the level paper
+  square used to peek out behind the turning mark.
+- **Inside a project**: `body.in-project` raises `.scrim` (a black gradient, 46vh, .78 at the foot)
+  under the copy, which sits bottom left in mute with an ink title line. The old paper-box card is gone.
 
 ## V.37 — the studies' type, the turning square, the ways out (2026-11-05, later)
 

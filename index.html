@@ -6,7 +6,7 @@
 <title>IAAH — I Am Always Hungry</title>
 <meta name="description" content="IAAH is an independent design studio focused on branding, visual identity, creative direction, print, title sequences, animation and interactive.">
 <meta name="theme-color" content="#000000">
-<link rel="stylesheet" href="css/site.css?v=37">
+<link rel="stylesheet" href="css/site.css?v=38">
 </head>
 <body>
 
@@ -16,28 +16,28 @@
 <div class="overlay">
   <button class="metro" id="metro" aria-label="About IAAH"><i class="sq" id="metro-sq"></i><span id="metro-label"></span></button>
 
+  <div class="scrim" id="scrim" aria-hidden="true"></div>
   <div class="detail" id="detail" hidden>
-    <button class="detail-x" id="detail-x" aria-label="Close project">Close</button>
     <span class="detail-meta" id="detail-meta"></span>
     <p class="detail-desc" id="detail-desc"></p>
   </div>
 
   <button class="lens-btn" id="lens-btn" hidden>Lens: on</button>
-  <button class="sound-btn" id="sound-btn" hidden>Sound: off</button>
   <div class="top">
-    <button class="about-btn" id="about-btn">About</button>
-    <button class="index-btn" id="works-btn">Works</button>
+    <button class="nav detail-x" id="detail-x" aria-label="Close project" hidden>Close</button>
+    <button class="nav index-btn" id="works-btn">Works</button>
   </div>
-  <button class="view-btn" id="view-btn" hidden></button>
+  <button class="nav sound-btn" id="sound-btn">Sound</button>
+  <button class="nav view-btn" id="view-btn" hidden></button>
   <div class="hint" hidden>G — effects panel</div>
-  <div class="version" id="version" hidden>V.37</div>
+  <div class="version" id="version" hidden>V.38</div>
   <div class="beat-dot" id="beat-dot" aria-hidden="true" hidden></div>
 </div>
 
 <div class="works-bed" id="works-bed" hidden></div>
 
 <!-- the opening runs at once, before the modules land -->
-<script src="js/intro.js?v=37"></script>
+<script src="js/intro.js?v=38"></script>
 
 <script type="importmap">
 {
@@ -47,6 +47,6 @@
   }
 }
 </script>
-<script type="module" src="js/app.js?v=37"></script>
+<script type="module" src="js/app.js?v=38"></script>
 </body>
 </html>

@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>IAAH · Grow · the way in</title>
-<link rel="stylesheet" href="../../css/site.css?v=37">
-<link rel="stylesheet" href="../_comps.css?v=37">
+<link rel="stylesheet" href="../../css/site.css?v=38">
+<link rel="stylesheet" href="../_comps.css?v=38">
 </head>
 <body>
 <div class="mkp">IAAH</div>
@@ -14,7 +14,7 @@
 <div class="grid" id="grid"></div>
 
 <script type="module">
-import { initAbout, GROWS } from '../../js/about.js?v=37';
+import { initAbout, GROWS } from '../../js/about.js?v=38';
 const NOTES = {
   square: ['Square', 'The mark’s own square grows until it is the screen, level, from the corner. B1 as it stands.'],
   circle: ['Circle', 'A circle opens from the mark’s centre until it covers the screen; the mark stays where it is.'],
@@ -29,7 +29,7 @@ GROWS.forEach((v, i) => {
   fig.innerHTML = `<div class="frame"><img class="still" src="../../content/iaah/${STILLS[i]}" alt="">
   <div class="overlay">
     <button class="metro"><i class="sq"></i><span>IAAH</span></button>
-    <div class="top"><button class="about-btn">About</button><button class="index-btn">Works</button></div>
+    <div class="top"><button class="nav index-btn">Works</button></div>
   </div></div>
   <figcaption><span class="no">G${i + 1}</span><span><span class="t">${NOTES[v][0]}</span><span class="n">${NOTES[v][1]} <a href="../../?about=${v}&intro=0" target="_blank">See it live →</a></span></span></figcaption>`;
   grid.appendChild(fig);
@@ -38,7 +38,6 @@ GROWS.forEach((v, i) => {
   const turn = (ms) => { const from = deg; deg += 90; sq.animate([{ transform: `rotate(${from}deg)` }, { transform: `rotate(${deg}deg)` }], { duration: ms, easing: 'cubic-bezier(.65,0,.35,1)', fill: 'forwards' }); };
   const a = initAbout({ host: ov, mark, variant: v, onOpen: () => turn(1500), onClose: () => turn(900) });
   mark.addEventListener('click', () => a.toggle());
-  ov.querySelector('.about-btn').addEventListener('click', () => a.open());
   setTimeout(() => a.open(), 1400 + i * 700);
 });
 </script>

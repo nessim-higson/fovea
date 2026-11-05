@@ -76,24 +76,29 @@ html.intro .overlay > * { pointer-events: none; }
 .about-open .metro .sq { background: #111; }
 .about-open .metro span { color: #f4f4f1; }
 
-/* ═══ the buttons: the studies' controls — 32 px, 11 px, a hairline, square corners ═══ */
-.btn, .index-btn, .about-btn, .view-btn, .about-x, .detail-x {
+/* ═══ the navigation: words with a hairline round them, no box. The colour
+   follows the imagery under each word (app.js samples the canvas): light on
+   dark work, ink on light work. ═══ */
+.nav, .index-btn, .sound-btn, .view-btn, .about-x, .detail-x, .wb-close, .wb-toggle button {
   display: inline-flex; align-items: center; justify-content: center;
   height: 32px; padding: 0 10px;
   font-size: 11px; line-height: 1; letter-spacing: .02em; white-space: nowrap;
-  color: var(--mute); background: var(--paper); border: 1px solid var(--line);
-  transition: color .15s, border-color .15s;
+  color: var(--ink); background: transparent; border: 1px solid rgba(236, 236, 232, .45);
+  transition: color .45s ease-out, border-color .45s ease-out, opacity .3s ease-out;
 }
-@media (hover: hover) { .btn:hover, .index-btn:hover, .about-btn:hover, .about-x:hover, .detail-x:hover { color: var(--ink); border-color: var(--rule); } }
-@media (max-width: 759px) { .btn, .index-btn, .about-btn, .view-btn, .about-x, .detail-x { height: 40px; } }
+.nav.dark { color: #111; border-color: rgba(17, 17, 17, .4); }
+@media (hover: hover) { .nav:hover, .wb-close:hover, .wb-toggle button:hover { border-color: currentColor; } }
+@media (max-width: 759px) { .nav, .index-btn, .sound-btn, .view-btn, .about-x, .detail-x, .wb-close, .wb-toggle button { height: 40px; } }
 
-/* top-right: About · Works */
+/* top-right: Close (inside a project) · Works */
 .top { position: absolute; right: var(--sr); top: var(--st); display: flex; gap: 4px; }
-
-/* View — dive into the project in view, straight from the landing: the one pressed button */
-.view-btn { position: absolute; left: 50%; bottom: var(--sb); transform: translateX(-50%); color: var(--paper); background: var(--ink); border-color: var(--ink); }
+.detail-x[hidden] { display: none; }
+/* Sound — bottom right */
+.sound-btn { position: absolute; right: var(--sr); bottom: var(--sb); }
+.sound-btn.on::before { content: ''; width: 6px; height: 6px; margin-right: 8px; background: currentColor; }
+/* View — dive into the project in view, straight from the landing — bottom centre */
+.view-btn { position: absolute; left: 50%; bottom: var(--sb); transform: translateX(-50%); }
 .view-btn[hidden] { display: none; }
-@media (hover: hover) { .view-btn:hover { transform: translateX(-50%); } }
 
 /* ═══ the opening (js/intro.js, from tempo study A1) ═══ */
 .intro-layer { position: fixed; inset: 0; z-index: 50; overflow: hidden; cursor: pointer; }
@@ -131,29 +136,28 @@ html.intro .overlay > * { pointer-events: none; }
 .about-info .ct a { color: var(--mute); }
 .about-info .ct a:hover { color: var(--ink); }
 .about-info .ln { opacity: 0; will-change: transform, opacity; }
-.about-x { position: absolute; right: var(--sr); top: var(--st); opacity: 0; transition: opacity .3s ease-out, color .15s, border-color .15s; }
+.about-x { position: absolute; right: var(--sr); top: var(--st); opacity: 0; color: var(--ink); border-color: rgba(17, 17, 17, .4); }
 .about.on .about-x { opacity: 1; }
 @media (max-width: 759px) {
   .about-info { left: var(--sl); right: var(--sr); top: calc(var(--st) + var(--ms) + 36px); transform: none; width: auto; }
 }
 
-/* ═══ the project card: the studies' label — a box of paper, bottom left ═══ */
-.detail {
-  position: absolute; left: var(--sl); bottom: var(--sb);
-  max-width: 44ch; padding: 6px 8px; margin: 0 0 -6px -8px;
-  font-size: 11px; line-height: 1.45; color: var(--mute); background: var(--paper);
+/* ═══ inside a project: a scrim rises from the bottom so the copy reads over the image ═══ */
+.scrim {
+  position: absolute; left: 0; right: 0; bottom: 0; height: min(46vh, 420px); pointer-events: none;
+  background: linear-gradient(to top, rgba(0, 0, 0, .78) 0%, rgba(0, 0, 0, .5) 38%, rgba(0, 0, 0, 0) 100%);
+  opacity: 0; transition: opacity .6s ease-out;
 }
+body.in-project .scrim { opacity: 1; }
+.detail { position: absolute; left: var(--sl); bottom: var(--sb); max-width: 48ch; color: var(--mute); }
 .detail[hidden] { display: none; }
 .detail-meta { display: block; font-weight: 500; color: var(--ink); }
 .detail-desc { margin-top: 0; }
-.detail-x { position: absolute; left: 0; top: -40px; margin: 0; }
-@media (max-width: 759px) { .detail { right: var(--sr); max-width: none; } .detail-x { top: -48px; } }
+@media (max-width: 759px) { .detail { right: var(--sr); max-width: none; bottom: calc(var(--sb) + 52px); } }
 
-/* the controls are hidden on the public site (V.36); the keyboard still works (G — effects panel) */
-.lens-btn, .sound-btn, .hint, .version, .beat-dot { display: none; }
-.lens-btn, .sound-btn { position: absolute; left: var(--sl); bottom: var(--sb); }
-.sound-btn { bottom: calc(var(--sb) + 40px); }
-.sound-btn.on { color: var(--paper); background: var(--ink); }
+/* the rest of the controls stay hidden on the public site (V.36); the keyboard still works (G — effects panel) */
+.lens-btn, .hint, .version, .beat-dot { display: none; }
+.lens-btn { position: absolute; left: var(--sl); bottom: var(--sb); }
 .hint { position: absolute; right: var(--sr); bottom: var(--sb); font-size: 11px; color: var(--faint); }
 .version { position: absolute; right: var(--sr); top: calc(var(--st) + 40px); font-size: 11px; color: var(--faint); }
 .beat-dot { position: absolute; right: var(--sr); top: calc(var(--st) + 44px); width: 9px; height: 9px; border-radius: 50%; background: var(--ink); opacity: .25; }
@@ -169,16 +173,10 @@ html.intro .overlay > * { pointer-events: none; }
 }
 .wb-cap .yr { margin-left: 10px; color: var(--mute); font-variant-numeric: tabular-nums; }
 .wb-toggle { position: absolute; left: 50%; bottom: var(--sb); transform: translateX(-50%); z-index: 9; display: flex; gap: 4px; }
-.wb-toggle button { display: inline-flex; align-items: center; height: 32px; padding: 0 10px; font-size: 11px; line-height: 1; letter-spacing: .02em; color: var(--mute); background: var(--paper); border: 1px solid var(--line); }
-.wb-toggle button.on { color: var(--ink); border-color: var(--rule); }
+.wb-toggle button { color: var(--mute); }
+.wb-toggle button.on { color: var(--ink); border-color: currentColor; }
 .wb-hint { position: absolute; right: var(--sr); top: calc(var(--st) + 44px); z-index: 9; font-size: 11px; color: var(--faint); text-align: right; }
-.wb-close {
-  position: absolute; right: var(--sr); top: var(--st); z-index: 10;
-  display: inline-flex; align-items: center; height: 32px; padding: 0 10px;
-  font-size: 11px; line-height: 1; letter-spacing: .02em; color: var(--mute); background: var(--paper); border: 1px solid var(--line);
-}
-.wb-close:hover { color: var(--ink); border-color: var(--rule); }
+.wb-close { position: absolute; right: var(--sr); top: var(--st); z-index: 10; }
 .wb-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 20; }
 .wb-flash.go { animation: wbFlash .55s ease; }
 @keyframes wbFlash { 0% { opacity: 0.72; } 100% { opacity: 0; } }
-@media (max-width: 759px) { .wb-toggle button, .wb-close { height: 40px; } }

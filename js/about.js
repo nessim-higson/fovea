@@ -85,6 +85,7 @@ export function initAbout({ host, mark, variant = 'square', exit = 'reverse', on
     sheet.style.transform = s.from.transform || ''; sheet.style.clipPath = s.from.clipPath || '';
     sheet.style.opacity = variant === 'scrim' ? 0 : '';
     root.style.transform = ''; root.style.opacity = ''; root.style.clipPath = ''; root.style.transformOrigin = '';
+    sheet.style.visibility = 'hidden';   // at rest nothing shows: the square's own turn would reveal a level paper square behind it
   }
   rest();
 
@@ -102,6 +103,7 @@ export function initAbout({ host, mark, variant = 'square', exit = 'reverse', on
     if (open) return; open = true; cancel();
     const s = states();
     rest();   // a close may have left the root moved
+    sheet.style.visibility = '';
     root.classList.add('on'); host.classList.add('about-open');
     if (instant) {
       Object.assign(sheet.style, s.to); info.querySelectorAll('.ln').forEach(l => { l.style.opacity = 1; });
