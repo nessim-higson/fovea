@@ -14,14 +14,14 @@ import * as THREE from 'three';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=55';
-import { initAbout } from './about.js?v=55';
+import { initWorksBed } from './worksbed.js?v=56';
+import { initAbout } from './about.js?v=56';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=55'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=56'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -46,7 +46,7 @@ const renderer = new THREE.WebGLRenderer({
   canvas: document.getElementById('gl'), antialias: false,   // a full-screen quad: multisampling buys nothing and costs a phone dearly (V.55)
   depth: false, stencil: false, powerPreference: 'high-performance',
 });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, COARSE ? 1.25 : 2));   // a phone's lens pass at 1.25 (V.49: was 1.5 — the load stuttered)
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, COARSE ? 1 : 2));   // a phone renders at 1× (V.56): the lens is soft by nature, and fill rate is the phone's limit
 
 let VW = 0, VH = 0;   // set by layout() (which runs immediately below)
 
@@ -96,11 +96,13 @@ const imageFrag = /* glsl */`
   }
 
   void main() {
-    float grain = hash(vUv + fract(sin(vec2(time, time * 1.3)) * 100.0));
     vec4 outColor = texture2D(map, vUv);
-    float avg = (outColor.r + outColor.g + outColor.b) / 3.0;
-    outColor.rgb = outColor.rgb * detailMode
-                 + vec3((1.0 - detailMode) * avg * (grain * 5.5 * (1.0 - avg)));
+    if (detailMode < 0.999) {   // the ghost look only (off by default): grain is not free on a phone
+      float grain = hash(vUv + fract(sin(vec2(time, time * 1.3)) * 100.0));
+      float avg = (outColor.r + outColor.g + outColor.b) / 3.0;
+      outColor.rgb = outColor.rgb * detailMode
+                   + vec3((1.0 - detailMode) * avg * (grain * 5.5 * (1.0 - avg)));
+    }
     outColor.rgb *= uLift;
     gl_FragColor = vec4(outColor.rgb, outColor.a * opacity);
   }
@@ -512,6 +514,9 @@ window.scrollTo(0, Math.floor(LOOPS / 2) * cycleH() + START * VH);
 }
 
 let smooth = window.scrollY, lastSmooth = smooth, scrollDif = 0;
+// on a phone the auto-drift no longer scrolls the window (Safari does real work on every
+// programmatic scroll); it is an offset added to the scroll instead (V.56)
+let driftPx = 0;
 // velocity that drives the distortion is computed from USER scroll only —
 // the auto-drift is subtracted out (see frame loop), so auto-playing
 // pages show clean, undistorted crops while manual scrolling still warps.
@@ -597,16 +602,16 @@ function turnMetro(deg = 90, ms = 1500) {
    drift pauses while it is up and resumes after. ?about=square|circle|wipe|turn|scrim */
 const QS = new URLSearchParams(location.search);
 const about = initAbout({
-  host: document.querySelector('.overlay'),
+  host: document.getElementById('about-host'),   // its own layer above the Works bed (V.56)
   mark: metroEl,
   variant: QS.get('about') || 'wipe',      // how the sheet comes in — the drop from the top, on a spring (Ness, V.50)
   exit: QS.get('out') || 'fade',           // how it goes out (?out=reverse|fade|lift|sweep|turn) — fade, Ness's pick
   drop: QS.get('drop') || 'soft',          // the drop's tempo (?drop=quick|soft|slow|slower) — soft, ω8 over 1.5 s
   onOpen: () => { stopAuto(false); document.body.style.overflow = 'hidden'; document.body.classList.add('about-open'); turnMetro(90); },
-  onClose: () => { document.body.style.overflow = ''; document.body.classList.remove('about-open'); turnMetro(90, 900); stopAuto(true); },
+  onClose: () => { document.body.style.overflow = worksBedOpen() ? 'hidden' : ''; document.body.classList.remove('about-open'); turnMetro(90, 900); if (!worksBedOpen()) stopAuto(true); },
 });
-// the mark: the write-up on the landing and inside a project; on the Works bed it is the way home
-metroEl.addEventListener('click', () => { if (worksBedOpen()) worksBed.close(); else about.toggle(); });
+// the mark opens the write-up from anywhere: the landing, a project, the Works bed (it comes in over the bed)
+metroEl.addEventListener('click', () => about.toggle());
 
 for (const ev of ['wheel', 'touchstart']) {
   window.addEventListener(ev, () => { casePinTop = false; stopAuto(); }, { passive: true });
@@ -753,7 +758,7 @@ function mountCase(i) {
   // start at the project's first image, top-aligned
   const y = caseTopY();
   window.scrollTo(0, y);
-  smooth = y; lastSmooth = y; scrollDif = 0;
+  smooth = y; lastSmooth = y; scrollDif = 0; driftPx = 0;
   prevY = y; userVel = 0;   // no smear flash from the position jump
   casePinTop = true;        // hold the top through async image re-flows
 
@@ -805,7 +810,7 @@ function closeDetail() {
     glEl.style.cursor = 'pointer';    // back on the landing — cover is clickable again
     spacer.style.height = (LOOPS * cycleH()) + 'px';
     window.scrollTo(0, homeY);
-    smooth = homeY; lastSmooth = homeY; scrollDif = 0;
+    smooth = homeY; lastSmooth = homeY; scrollDif = 0; driftPx = 0;
     prevY = homeY; userVel = 0;
 
     setLens(true);           // lens blooms back during the fade-in
@@ -956,21 +961,24 @@ function frame(now) {
     } else {
       auto.acc += SETTINGS.autoSpeed * dt / 1000;
       autoWhole = Math.trunc(auto.acc);
-      if (autoWhole !== 0) { casePinTop = false; window.scrollBy(0, autoWhole); auto.acc -= autoWhole; }
+      if (autoWhole !== 0) { casePinTop = false; auto.acc -= autoWhole;
+        if (IS_TOUCH) { driftPx += autoWhole; const cyc = (detailOpen && caseTrack) ? (caseTrack.trackH || VH) : cycleH(); if (driftPx > cyc) driftPx -= cyc; }
+        else window.scrollBy(0, autoWhole); }
     }
   }
 
   // slide positions follow the TOTAL scroll (auto + user + glide).
   // touch: lock to the real scroll (no lag, no direction-reversal blip,
   // and rebase teleports stay perfectly seamless). desktop: weighted glide.
-  if (IS_TOUCH) smooth = window.scrollY;
+  if (IS_TOUCH) smooth = window.scrollY + driftPx;
   else smooth += (window.scrollY - smooth) * SETTINGS.smoothLerp;
   lastSmooth = smooth;
 
   // distortion velocity follows USER scroll only — subtract the auto
   // drift so a drifting page is a clean focused crop, not a warped one
+  // (on touch the drift never touched the scroll, so there is nothing to subtract)
   const curY = window.scrollY;
-  const userDelta = (curY - prevY) - autoWhole;
+  const userDelta = (curY - prevY) - (IS_TOUCH ? 0 : autoWhole);
   prevY = curY;
   userVel += (userDelta - userVel) * SETTINGS.scrollLerp;
 
@@ -1015,6 +1023,10 @@ function frame(now) {
   }
 
   audio.setWarp(vel, SETTINGS.maxVelocity);
+
+  // while the opening still covers the canvas nothing is visible: skip both passes (the phone's GPU
+  // is busy enough with the opening's own animation)
+  if (state.opacity === 0 && !tweens.opacity) { updateNav(); requestAnimationFrame(frame); return; }
 
   const u = materials[activeEffect].uniforms;
   u.time.value = ms;
@@ -1063,7 +1075,7 @@ function frame(now) {
    just drawn under each word and flip it ink / paper with some hysteresis ── */
 const navEls = [...document.querySelectorAll('.nav')];
 const navBuf = new Uint8Array(8 * 8 * 4);
-let navTick = 0; const NAV_EVERY = COARSE ? 10 : 8;   // the phone's sampling is cheap now (no readback), so it can be frequent
+let navTick = 0; const NAV_EVERY = COARSE ? 20 : 8;   // the phone's sampling is cheap (no readback), but it measures four rects
 // what image is under a point of the viewport, and which cell of its 3×3 grid
 function lumUnder(ex, ey) {
   const col = Math.min(2, Math.floor(ex / VW * 3));

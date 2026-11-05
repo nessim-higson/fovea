@@ -1,6 +1,11 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-06_ · **V.55 — LIVE on https://iamalwayshungry.com**
+_Last updated: 2026-11-06_ · **V.56 — LIVE on https://iamalwayshungry.com**
+
+V.56 (more phone work): the auto-drift on touch is an offset (`driftPx`) added to the scroll instead of a
+`scrollBy` every frame (Safari does real work on each programmatic scroll); the drift resets wherever the
+scroll is set outright. Phones render at 1×. The slide shader's grain runs only in the ghost look. Nothing
+is drawn while the opening still covers the canvas. Nav sampling every 20th frame on a phone. **The write-up has its own layer** (`#about-host`, z 35, above the bed's 30 and below the mark's 40), so the mark opens it from anywhere, the Works bed included; closing it there returns to the bed with the scroll still locked.
 
 V.55: **the mark turns with the Works bed** (`onMotion` from `worksbed.js` → `turnMetroWith`, the landing's
 rate at half, same °/s cap). **Phone performance:** both WebGL contexts without multisampling, depth or

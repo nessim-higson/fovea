@@ -129,6 +129,7 @@ html.intro .metro { opacity: 0; pointer-events: none; }
 
 /* ═══ the write-up: a sheet of paper that grows out of the mark (js/about.js, from tempo study B1) ═══
    The sheet runs on the light tokens: paper on paper, ink #111, the contact line in mute. */
+.about-host { position: fixed; inset: 0; z-index: 35; pointer-events: none; }   /* above the bed (30), below the mark (40) */
 .about {
   --paper: #ecece8; --ink: #151514; --mute: rgba(21, 21, 20, .6);
   position: absolute; inset: 0; z-index: 5; pointer-events: none; overflow: hidden;
