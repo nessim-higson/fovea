@@ -1,6 +1,11 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.52 — LIVE on https://iamalwayshungry.com**
+_Last updated: 2026-11-05_ · **V.53 — LIVE on https://iamalwayshungry.com**
+
+V.53: the phone's jump, properly — on a touch device `layout()` sizes the loop to the LARGE viewport from
+the first frame (a `100lvh` probe, `largeViewportHeight()`), so the address bar folding away on the first
+drag changes nothing: no relayout, no remap. The V.52 ratio scaling stays for real height changes
+(rotation). Covers and project images fade up over 500 ms as they land (`holder.landed`) instead of popping.
 
 V.52: the phone's first-drag blip — the loop's unit is VH, so when the address bar folds away on the first
 drag (height grows, `layout()` re-runs) the same scrollY landed on a different project. `layout()` now

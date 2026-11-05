@@ -15,14 +15,14 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=52';
-import { initAbout } from './about.js?v=52';
+import { initWorksBed } from './worksbed.js?v=53';
+import { initAbout } from './about.js?v=53';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=52'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=53'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -178,6 +178,7 @@ function loadMedia(src, holder, done = () => {}) {
       t.colorSpace = THREE.SRGBColorSpace;
       holder.mat.uniforms.map.value = t;
       holder.imgW = nw; holder.imgH = nh; holder.fit();
+      holder.landed = performance.now();   // fades up from black over 500 ms (the frame loop)
       fin();
     });
     img.onerror = fin;
@@ -429,9 +430,18 @@ window.addEventListener('pointermove', (e) => {
                   -((e.clientY / window.innerHeight) * 2 - 1));
 });
 
+// a phone's LARGE viewport (the height once the address bar has folded away), read from a
+// 100lvh probe. Sizing the loop to it from the first frame means the bar folding on the first
+// drag changes nothing: no relayout, no remapping of the scroll onto another project (V.53).
+let lvhProbe = null;
+function largeViewportHeight() {
+  if (!lvhProbe) { lvhProbe = document.createElement('div'); lvhProbe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:100lvh;visibility:hidden;pointer-events:none'; document.body.appendChild(lvhProbe); }
+  const h = lvhProbe.clientHeight;
+  return h > 0 ? h : window.innerHeight;
+}
 function layout() {
   const w = window.innerWidth;
-  let h = window.innerHeight;
+  let h = IS_TOUCH ? Math.max(window.innerHeight, largeViewportHeight()) : window.innerHeight;
   if (!w || !h) { requestAnimationFrame(layout); return; }   // a zero-size moment (a pane opening) would poison every ratio — try again next frame
   // ignore the mobile address-bar height shrink (same width, smaller
   // height): relaying out on it would jump the content as the bar
@@ -958,6 +968,7 @@ function frame(now) {
       let d = center - pos;
       d = ((d % cyc) + cyc * 1.5) % cyc - cyc / 2; // wrap to nearest copy
       it.mesh.position.y = -d;
+      if (it.landed) it.mat.uniforms.opacity.value = Math.min(1, (now - it.landed) / 500);
       it.mat.uniforms.time.value = ms;
       it.mat.uniforms.uVel.value = vel;
       it.mat.uniforms.uBend.value = 0;
@@ -970,6 +981,7 @@ function frame(now) {
       let d = i * VH - pos;
       d = ((d % cyc) + cyc * 1.5) % cyc - cyc / 2; // wrap to nearest copy
       s.mesh.position.y = -d;
+      if (s.landed) s.mat.uniforms.opacity.value = Math.min(1, (now - s.landed) / 500);
       s.mat.uniforms.time.value = ms;
       s.mat.uniforms.uVel.value = vel;
       s.mat.uniforms.uBend.value = SETTINGS.trackBend;
