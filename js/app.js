@@ -15,14 +15,14 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=50';
-import { initAbout } from './about.js?v=50';
+import { initWorksBed } from './worksbed.js?v=51';
+import { initAbout } from './about.js?v=51';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=50'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=51'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -558,6 +558,7 @@ const about = initAbout({
   mark: metroEl,
   variant: QS.get('about') || 'wipe',      // how the sheet comes in — the drop from the top, on a spring (Ness, V.50)
   exit: QS.get('out') || 'fade',           // how it goes out (?out=reverse|fade|lift|sweep|turn) — fade, Ness's pick
+  drop: QS.get('drop') || 'soft',          // the drop's tempo (?drop=quick|soft|slow|slower) — soft, ω8 over 1.5 s
   onOpen: () => { stopAuto(false); document.body.style.overflow = 'hidden'; turnMetro(90); },
   onClose: () => { document.body.style.overflow = ''; turnMetro(90, 900); stopAuto(true); },
 });

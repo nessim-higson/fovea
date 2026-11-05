@@ -1,6 +1,9 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.50 — LIVE on https://iamalwayshungry.com**
+_Last updated: 2026-11-05_ · **V.51 — LIVE on https://iamalwayshungry.com**
+
+V.51: the drop slower, with its ease-in — a spring from rest (ζ .72, ω 8, 1.5 s) is the default; `?drop=quick`
+(ω 11, 1.2 s), `slow` (ω 6.5, 1.8 s), `slower` (ω 5.5, 2.1 s) to compare. The type starts at 42 % of the drop.
 
 V.50: the write-up's sheet drops in from the top (`variant: 'wipe'` is now a translateY drop, the default):
 1.1 s on a spring (ζ .72, ω 13, as a `linear()` easing from the studies' `spring()`; expo where

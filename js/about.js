@@ -31,10 +31,15 @@ function spring(z, w, T, n = 80) {
   pts[n] = '1';
   return 'linear(' + pts.join(',') + ')';
 }
-// the drop's landing: a fast fall that settles with a 4 % overshoot (hidden by the sheet's headroom); browsers without linear() get the expo
-const DROP = (typeof CSS !== 'undefined' && CSS.supports && CSS.supports('animation-timing-function', 'linear(0, 1)')) ? spring(.72, 13, 1.1) : EXPO;
+// the drop: a spring from rest eases in by itself (zero velocity at the top, then gathers), falls, and
+// settles with a ~4 % overshoot hidden by the sheet's headroom. Three tempos; `?drop=` picks one.
+// V.51: Ness found ω13 too fast — the default is ω8 over 1.5 s. Browsers without linear() get the expo.
+const HAS_LINEAR = typeof CSS !== 'undefined' && CSS.supports && CSS.supports('animation-timing-function', 'linear(0, 1)');
+export const DROPS = { quick: [.72, 11, 1.2], soft: [.72, 8, 1.5], slow: [.72, 6.5, 1.8], slower: [.74, 5.5, 2.1] };
+function dropFor(name) { const d = DROPS[name] || DROPS.soft; return { ease: HAS_LINEAR ? spring(d[0], d[1], d[2]) : EXPO, ms: Math.round(d[2] * 1000), at: Math.round(d[2] * 1000 * .42) }; }
 
-export function initAbout({ host, mark, variant = 'square', exit = 'reverse', onOpen, onClose }) {
+export function initAbout({ host, mark, variant = 'square', exit = 'reverse', drop = 'soft', onOpen, onClose }) {
+  const D = dropFor(drop);
   if (!GROWS.includes(variant)) variant = 'square';
   if (!EXITS.includes(exit)) exit = 'reverse';
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -84,7 +89,7 @@ export function initAbout({ host, mark, variant = 'square', exit = 'reverse', on
     }
     if (variant === 'wipe') {   // the drop: the sheet falls in from above and lands on a spring. 20 % headroom hides the overshoot
       sheet.style.top = '-20%'; sheet.style.height = '120%'; sheet.style.transformOrigin = '';
-      return { from: { transform: 'translateY(-100%)' }, to: { transform: 'translateY(0)' }, ms: 1100, ease: DROP, at: 380 };
+      return { from: { transform: 'translateY(-100%)' }, to: { transform: 'translateY(0)' }, ms: D.ms, ease: D.ease, at: D.at };
     }
     sheet.style.top = ''; sheet.style.height = '';
     return { from: { opacity: 0 }, to: { opacity: 1 }, ms: 800 };   // scrim
