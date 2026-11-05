@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-type="b">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FOVEA</title>
-<link rel="stylesheet" href="css/site.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>IAAH — I Am Always Hungry</title>
+<meta name="description" content="IAAH is an independent design studio focused on branding, visual identity, creative direction, print, title sequences, animation and interactive.">
+<meta name="theme-color" content="#000000">
+<link rel="stylesheet" href="css/site.css?v=36">
 </head>
 <body>
 
@@ -12,7 +14,7 @@
 <div id="spacer"></div>
 
 <div class="overlay">
-  <button class="metro" id="metro" aria-label="Pause motion"><span id="metro-label"></span></button>
+  <button class="metro" id="metro" aria-label="About IAAH"><span id="metro-label"></span></button>
 
   <div class="detail" id="detail" hidden>
     <button class="detail-x" id="detail-x" aria-label="Close project">&#10005;</button>
@@ -20,16 +22,20 @@
     <p class="detail-desc" id="detail-desc"></p>
   </div>
 
-  <button class="lens-btn" id="lens-btn">Lens: on</button>
-  <button class="sound-btn" id="sound-btn">Sound: off</button>
+  <button class="lens-btn" id="lens-btn" hidden>Lens: on</button>
+  <button class="sound-btn" id="sound-btn" hidden>Sound: off</button>
+  <button class="about-btn" id="about-btn">About</button>
   <button class="index-btn" id="works-btn">Works</button>
   <button class="view-btn" id="view-btn" hidden></button>
-  <div class="hint">G — effects panel</div>
-  <div class="version" id="version">V.35</div>
-  <div class="beat-dot" id="beat-dot" aria-hidden="true"></div>
+  <div class="hint" hidden>G — effects panel</div>
+  <div class="version" id="version" hidden>V.36</div>
+  <div class="beat-dot" id="beat-dot" aria-hidden="true" hidden></div>
 </div>
 
 <div class="works-bed" id="works-bed" hidden></div>
+
+<!-- the opening runs at once, before the modules land -->
+<script src="js/intro.js?v=36"></script>
 
 <script type="importmap">
 {
@@ -39,6 +45,6 @@
   }
 }
 </script>
-<script type="module" src="js/app.js?v=35"></script>
+<script type="module" src="js/app.js?v=36"></script>
 </body>
 </html>

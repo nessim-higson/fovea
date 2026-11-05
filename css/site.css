@@ -3,14 +3,51 @@
    The page is one WebGL canvas; DOM is overlay text only.
    ═══════════════════════════════════════════════════════════════════ */
 
+/* ── type: Helvetica Neue throughout (V.36). The treatments are tokens, so a
+   comp is a data-type value: html[data-type] on the site (?type=a|b|c|d),
+   or a .frame[data-type] on the comps pages. ── */
+:root, [data-type] {
+  --sans: "Helvetica Neue", HelveticaNeue, Helvetica, Arial, sans-serif;
+  --sl: 16px;                               /* the mark's inset */
+  --ms: 68px;                               /* the mark's side */
+  --ease: cubic-bezier(.65, 0, .35, 1);     /* the live site's one ease */
+}
+/* B · Selects — the studies' tokens: 13/1.45 sentence case, a 60-character measure (default) */
+:root, [data-type="b"] {
+  --ui-size: 11px; --ui-weight: 500; --ui-track: .06em; --ui-case: uppercase;
+  --body-size: 13px; --body-lh: 1.45; --body-weight: 400; --body-track: 0; --measure: 60ch;
+}
+/* A · Tracked caps — the mono's voice kept, in Helvetica: small caps-tracked UI, a tracked 12 px body */
+[data-type="a"] {
+  --ui-size: 11px; --ui-weight: 500; --ui-track: .1em; --ui-case: uppercase;
+  --body-size: 12px; --body-lh: 1.6; --body-weight: 400; --body-track: .03em; --measure: 56ch;
+}
+/* C · One size — everything 13 px regular, sentence case, no tracking; the chrome and the write-up are the same voice */
+[data-type="c"] {
+  --ui-size: 13px; --ui-weight: 400; --ui-track: 0; --ui-case: none;
+  --body-size: 13px; --body-lh: 1.45; --body-weight: 400; --body-track: 0; --measure: 60ch;
+}
+/* D · Large light — a 20 px light write-up on a 42-character measure; the chrome 12 px medium, sentence case */
+[data-type="d"] {
+  --ui-size: 12px; --ui-weight: 500; --ui-track: 0; --ui-case: none;
+  --body-size: 20px; --body-lh: 1.3; --body-weight: 300; --body-track: -.005em; --measure: 42ch;
+}
+@media (max-width: 759px) {
+  :root, [data-type="b"], [data-type="c"] { --body-size: 15px; }
+  [data-type="a"] { --body-size: 13px; }
+  [data-type="d"] { --body-size: 17px; }
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
   background: #000;
   color: #fff;
-  font-family: "SF Mono", ui-monospace, Menlo, monospace;
-  font-size: 11px;
-  letter-spacing: 0.08em;
+  font-family: var(--sans);
+  font-size: var(--ui-size);
+  font-weight: var(--ui-weight);
+  letter-spacing: var(--ui-track);
+  -webkit-font-smoothing: antialiased;
   /* kill mobile pull-to-refresh + overscroll bounce/chaining — a hard
      flick used to reach the top edge and reload the page (landing on a
      different image). overscroll-behavior:none keeps the loop seamless. */
@@ -28,27 +65,82 @@ body::-webkit-scrollbar { display: none; }
 
 .overlay { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
 .overlay > * { pointer-events: auto; }
+/* the chrome arrives with the work, once the opening has run (js/intro.js) */
+.overlay { transition: opacity .75s ease-out; }
+html.intro .overlay { opacity: 0; pointer-events: none; }
+html.intro .overlay > * { pointer-events: none; }
 
-/* IAAH square — a visible metronome. it turns with the motion (steady on
-   auto-drift, fast on a quick scroll, still when paused) and click = pause/play.
-   Lifted from the UNIQLOCK landmark mark. Sharp corners on purpose: a rotating
-   square reads as a metronome / time passing. */
+/* IAAH square — the mark. It turns with the motion (steady on auto-drift,
+   fast on a quick scroll) and click opens the write-up (the sheet grows out
+   of it). Lifted from the UNIQLOCK landmark mark. Sharp corners on purpose. */
 .metro {
-  position: absolute; left: 16px; top: 16px;
-  width: 68px; height: 68px;
+  position: absolute; left: var(--sl); top: var(--sl);
+  width: var(--ms); height: var(--ms);
   z-index: 11;
   background: #fff; color: #111;
   display: flex; align-items: center; justify-content: center;
   border: 0; padding: 0; cursor: pointer;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-weight: 700; font-size: 12px; letter-spacing: 0.08em;
+  font-family: var(--sans);
+  font-weight: 700; font-size: 12px; letter-spacing: 0.02em;
   text-transform: uppercase;
   will-change: transform;
   user-select: none; -webkit-user-select: none;
+  transition: background .3s ease-out, color .3s ease-out;
 }
 .metro span { pointer-events: none; }
 /* paused = motion stopped: invert + a ring so the stop reads clearly */
 .metro.paused { background: #111; color: #fff; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.85); }
+/* on the white sheet the mark inverts: ink on paper */
+.about-open .metro { background: #111; color: #fff; }
+
+/* ═══ the opening (js/intro.js, from tempo study A1) ═══ */
+.intro-layer { position: fixed; inset: 0; z-index: 50; overflow: hidden; cursor: pointer; }
+.intro-layer .ld { position: absolute; background: #fff; transform-origin: center; will-change: transform, opacity; }
+.intro-layer .ldw {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  color: #111; font-weight: 700; font-size: 12px; letter-spacing: .02em; line-height: 1; white-space: nowrap;
+  will-change: transform, opacity;
+}
+.intro-layer .nm {
+  position: absolute; top: 50%; margin-top: -.5em;
+  font-size: 13px; font-weight: 400; letter-spacing: 0; line-height: 1; text-transform: none;
+  color: rgba(255,255,255,.55); white-space: nowrap; will-change: transform, opacity;
+}
+.intro-layer .nm.l { right: calc(50% + var(--ms) / 2 + 20px); }
+.intro-layer .nm.r { left: calc(50% + var(--ms) / 2 + 20px); }
+
+/* ═══ the write-up: a white sheet that grows out of the mark (js/about.js, from tempo study B1) ═══ */
+.about { position: absolute; inset: 0; z-index: 5; pointer-events: none; overflow: hidden; }
+.about.on { pointer-events: auto; }
+.about-sheet { position: absolute; left: 0; top: 0; background: #fff; will-change: transform, clip-path, opacity; }
+.about-sheet.full { width: 100%; height: 100%; }
+.about-info {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(var(--measure), calc(100% - 2 * var(--sl)));
+  color: #111;
+  font-size: var(--body-size); line-height: var(--body-lh); font-weight: var(--body-weight);
+  letter-spacing: var(--body-track); text-transform: none;
+}
+.about-info p { margin: 0; }
+.about-info p + p { margin-top: .9em; }
+.about-info .ct { margin-top: 1.8em; color: rgba(0,0,0,.5); }
+.about-info .ct a { color: inherit; text-decoration: none; }
+.about-info .ct a:hover { color: #111; }
+.about-info .ln { opacity: 0; will-change: transform, opacity; }
+.about-x {
+  position: absolute; right: 14px; top: 16px;
+  padding: 6px 14px;
+  text-transform: var(--ui-case);
+  background: transparent; color: rgba(0,0,0,.55);
+  border: 1px solid rgba(0,0,0,.2); font: inherit; letter-spacing: inherit;
+  border-radius: 999px; cursor: pointer;
+  opacity: 0; transition: opacity .3s ease-out, color .15s;
+}
+.about.on .about-x { opacity: 1; }
+.about-x:hover { color: #111; }
+@media (max-width: 759px) {
+  .about-info { left: var(--sl); right: var(--sl); top: calc(var(--sl) + var(--ms) + 36px); transform: none; width: auto; }
+}
 
 /* category tabs — bottom-centre */
 .cat-tabs {
@@ -64,7 +156,7 @@ body::-webkit-scrollbar { display: none; }
 .cat-tabs:empty { display: none; }
 .cat-tabs button {
   padding: 5px 14px;
-  text-transform: uppercase;
+  text-transform: var(--ui-case);
   background: transparent;
   color: rgba(255,255,255,0.7);
   border: 0; font: inherit; letter-spacing: inherit;
@@ -89,10 +181,10 @@ body::-webkit-scrollbar { display: none; }
 .rail::-webkit-scrollbar { display: none; }
 .rail button {
   padding: 2px 2px;
-  text-transform: uppercase;
+  text-transform: var(--ui-case);
   background: transparent;
   color: rgba(255,255,255,0.55);
-  border: 0; font: inherit; letter-spacing: 0.08em; font-size: 10px;
+  border: 0; font: inherit; letter-spacing: var(--ui-track); font-size: 10px;
   cursor: pointer; white-space: nowrap;
   transition: color 150ms;
   text-align: right;
@@ -116,13 +208,14 @@ body::-webkit-scrollbar { display: none; }
 }
 .detail[hidden] { display: none; }
 .detail-meta {
-  text-transform: uppercase;
+  text-transform: var(--ui-case);
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: calc(var(--ui-track) + .02em);
 }
 .detail-desc {
   margin-top: 8px;
-  line-height: 1.6;
+  font-size: var(--body-size); line-height: var(--body-lh); font-weight: var(--body-weight);
+  letter-spacing: var(--body-track); text-transform: none;
   color: rgba(255,255,255,0.75);
 }
 .detail-x {
@@ -138,7 +231,7 @@ body::-webkit-scrollbar { display: none; }
 .lens-btn {
   position: absolute; left: 14px; bottom: 14px;
   padding: 6px 14px;
-  text-transform: uppercase;
+  text-transform: var(--ui-case);
   background: rgba(0,0,0,0.25);
   color: #fff; border: 0; font: inherit; letter-spacing: inherit;
   backdrop-filter: blur(10px);
@@ -151,7 +244,7 @@ body::-webkit-scrollbar { display: none; }
 .sound-btn {
   position: absolute; left: 14px; bottom: 52px;
   padding: 6px 14px;
-  text-transform: uppercase;
+  text-transform: var(--ui-case);
   background: rgba(0,0,0,0.25);
   color: #fff; border: 0; font: inherit; letter-spacing: inherit;
   backdrop-filter: blur(10px);
@@ -165,7 +258,7 @@ body::-webkit-scrollbar { display: none; }
 .hint {
   position: absolute; right: 14px; bottom: 14px;
   padding: 6px 0;
-  text-transform: uppercase;
+  text-transform: var(--ui-case);
   opacity: 0.45;
 }
 
@@ -188,23 +281,29 @@ body::-webkit-scrollbar { display: none; }
   will-change: transform, opacity;
 }
 
-/* ═══ Works trigger — summons the global Works bed ═══ */
-.index-btn {
-  position: absolute; right: 14px; top: 44px;
+/* the controls are hidden on the public site (V.36); the keyboard still works
+   (G — effects panel). [hidden] wins over the class rules because none of
+   them set display. */
+.lens-btn[hidden], .sound-btn[hidden], .hint[hidden], .version[hidden], .beat-dot[hidden] { display: none; }
+
+/* ═══ top-right: About · Works ═══ */
+.index-btn, .about-btn {
+  position: absolute; right: 14px; top: 16px;
   padding: 6px 14px;
-  text-transform: uppercase;
+  text-transform: var(--ui-case);
   background: rgba(0,0,0,0.25);
   color: #fff; border: 1px solid rgba(255,255,255,0.25); font: inherit; letter-spacing: inherit;
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   border-radius: 999px; cursor: pointer;
 }
-.index-btn:hover { background: rgba(255,255,255,0.15); }
+.about-btn { right: auto; left: calc(var(--sl) + var(--ms) + 30px); }   /* clear of the turning square's corners */
+.index-btn:hover, .about-btn:hover { background: rgba(255,255,255,0.15); }
 
 /* View — dive into the project currently in view, straight from the landing */
 .view-btn {
   position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
   padding: 9px 20px;
-  text-transform: uppercase; letter-spacing: 0.14em;
+  text-transform: var(--ui-case); letter-spacing: calc(var(--ui-track) + .04em);
   background: rgba(255,255,255,0.92); color: #000;
   border: 0; font: inherit; border-radius: 999px; cursor: pointer;
   box-shadow: 0 6px 26px rgba(0,0,0,0.4);
@@ -219,25 +318,25 @@ body::-webkit-scrollbar { display: none; }
 .wb-gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; cursor: default; }
 .wb-cap {
   position: absolute; left: 50%; bottom: 8vh; transform: translateX(-50%); z-index: 6; pointer-events: none;
-  font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #fff; text-shadow: 0 2px 14px #000;
+  font-size: 12px; letter-spacing: calc(var(--ui-track) + .04em); text-transform: var(--ui-case); color: #fff; text-shadow: 0 2px 14px #000;
   opacity: 0; transition: opacity .25s; white-space: nowrap;
 }
-.wb-cap .yr { margin-left: 10px; font-size: 10px; letter-spacing: 0.18em; color: rgba(255,255,255,0.6); }
+.wb-cap .yr { margin-left: 10px; font-size: 10px; letter-spacing: calc(var(--ui-track) + .08em); color: rgba(255,255,255,0.6); }
 .wb-toggle { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 9; display: flex; gap: 6px; }
 .wb-toggle button {
-  font: inherit; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  font: inherit; font-size: 10px; letter-spacing: calc(var(--ui-track) + .04em); text-transform: var(--ui-case);
   color: rgba(255,255,255,0.5); background: transparent; border: 0; padding: 6px 13px; border-radius: 999px; cursor: pointer;
 }
 .wb-toggle button.on { background: rgba(255,255,255,0.92); color: #000; }
 .wb-hint {
-  position: absolute; right: 20px; top: 22px; z-index: 9; font-size: 9px; letter-spacing: 0.14em;
-  text-transform: uppercase; color: rgba(255,255,255,0.4); text-align: right;
+  position: absolute; right: 20px; top: 22px; z-index: 9; font-size: 9px; letter-spacing: calc(var(--ui-track) + .04em);
+  text-transform: var(--ui-case); color: rgba(255,255,255,0.4); text-align: right;
 }
 .wb-close {
   position: absolute; left: 20px; top: 20px; z-index: 10;
   padding: 8px 15px; border-radius: 999px;
   background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.28);
-  color: #fff; font: inherit; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer;
+  color: #fff; font: inherit; font-size: 11px; letter-spacing: calc(var(--ui-track) + .04em); text-transform: var(--ui-case); cursor: pointer;
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
 .wb-close:hover { background: rgba(255,255,255,0.18); }

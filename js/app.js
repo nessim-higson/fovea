@@ -15,13 +15,14 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=35';
+import { initWorksBed } from './worksbed.js?v=36';
+import { initAbout } from './about.js?v=36';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=35'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=36'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -407,6 +408,7 @@ window.addEventListener('pointermove', (e) => {
 function layout() {
   const w = window.innerWidth;
   let h = window.innerHeight;
+  if (!w || !h) { requestAnimationFrame(layout); return; }   // a zero-size moment (a pane opening) would poison every ratio — try again next frame
   // ignore the mobile address-bar height shrink (same width, smaller
   // height): relaying out on it would jump the content as the bar
   // reappears on a direction reversal. only grow the height, or relayout
@@ -500,17 +502,28 @@ function stopAuto(resumable = true) {
     auto.idleTimer = setTimeout(startAuto, SETTINGS.autoResume * 1000);
   }
 }
-setTimeout(startAuto, 2500); // let the intro tweens land first
+// the mark's own turn, on demand (the write-up opening): a quarter further, 1.5 s,
+// the one ease — then the scroll-driven rotation carries on from there.
+function turnMetro(deg = 90, ms = 1500) {
+  const from = metroDeg, to = metroDeg + deg;
+  metroDeg = ((to % 360) + 360) % 360;
+  const a = metroEl.animate([{ transform: `rotate(${from}deg)` }, { transform: `rotate(${to}deg)` }],
+    { duration: ms, easing: 'cubic-bezier(.65,0,.35,1)' });
+  a.onfinish = () => { metroEl.style.transform = 'rotate(' + metroDeg.toFixed(2) + 'deg)'; };
+}
 
-// click the square to stop / resume the motion — works on the home lens view
-// and inside a project (the case track), since both ride the same auto-drift.
-metroEl.addEventListener('click', () => {
-  metroPaused = !metroPaused;
-  metroEl.classList.toggle('paused', metroPaused);
-  metroEl.setAttribute('aria-label', metroPaused ? 'Resume motion' : 'Pause motion');
-  if (metroPaused) stopAuto(false);   // hard stop, no idle resume
-  else startAuto();
+/* ── the write-up: a white sheet that grows out of the mark (js/about.js) ──
+   click the mark (or About) to open; the mark, Esc or Close to close. The
+   drift pauses while it is up and resumes after. ?about=square|circle|wipe|turn|scrim */
+const about = initAbout({
+  host: document.querySelector('.overlay'),
+  mark: metroEl,
+  variant: new URLSearchParams(location.search).get('about') || 'square',
+  onOpen: () => { stopAuto(false); document.body.style.overflow = 'hidden'; turnMetro(90); },
+  onClose: () => { document.body.style.overflow = ''; turnMetro(90, 900); stopAuto(true); },
 });
+metroEl.addEventListener('click', () => { if (!worksBedOpen()) about.toggle(); });
+document.getElementById('about-btn').addEventListener('click', () => about.open());
 
 for (const ev of ['wheel', 'touchstart']) {
   window.addEventListener(ev, () => { casePinTop = false; stopAuto(); }, { passive: true });
@@ -534,9 +547,13 @@ function tween(key, to, ms) {
     return k < 1;
   };
 }
-// intro, matching the reference: fade 1.5s, lens in over 2s
-tween('opacity', 1, 1500);
-tween('displacement', 1, 2000);
+// intro, matching the reference: fade 1.5s, lens in over 2s — once the opening
+// (js/intro.js, the square) lets the work arrive
+(window.__intro || Promise.resolve()).then(() => {
+  tween('opacity', 1, 1500);
+  tween('displacement', 1, 2000);
+  setTimeout(startAuto, 2500); // let the intro tweens land first
+});
 
 /* ── lens button ───────────────────────────────────────────────────── */
 const ui = { lens: true, ghost: false };
@@ -559,6 +576,7 @@ soundBtn.addEventListener('click', () => {
 });
 
 /* ── global nav: the Works bed ─────────────────────────────────────── */
+function worksBedOpen() { return typeof worksBed !== 'undefined' && worksBed.isOpen(); }
 // the primary lens-scroll stays the landing; Works zooms out to an infinite
 // lens-warped bed of every cover (js/worksbed.js). Click a cover to dive in.
 const worksBed = initWorksBed({
@@ -568,6 +586,7 @@ const worksBed = initWorksBed({
   isPlaying: () => !metroPaused,        // the square's tempo conducts the drift
 });
 document.getElementById('works-btn').addEventListener('click', () => {
+  if (about.isOpen()) about.close();
   if (worksBed.isOpen()) worksBed.close();
   else worksBed.open(detailOpen ? detailIdx : currentIndex());
 });
@@ -577,7 +596,7 @@ const viewBtn = document.getElementById('view-btn');
 const glEl = document.getElementById('gl');
 glEl.style.cursor = 'pointer';   // on the landing the cover is clickable — show it
 function diveFromLanding() {
-  if (transitioning || detailOpen || worksBed.isOpen()) return;
+  if (transitioning || detailOpen || worksBed.isOpen() || about.isOpen()) return;
   const i = currentIndex();
   stopAuto(false);
   // symmetric with closing out: fade THROUGH BLACK (masks the scene swap so it
@@ -701,7 +720,8 @@ function closeDetail() {
 detailX.addEventListener('click', closeDetail);
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    if (worksBed.isOpen()) worksBed.close();
+    if (about.isOpen()) about.close();
+    else if (worksBed.isOpen()) worksBed.close();
     else if (detailOpen) closeDetail();
   }
 });
@@ -713,7 +733,7 @@ function updateNav() {
   viewBtn.hidden = !onHome;
   if (onHome) {
     const i = currentIndex();
-    if (i !== lastViewIdx) { lastViewIdx = i; viewBtn.textContent = `View ${PROJECTS[i].client} ↗`; }
+    if (i !== lastViewIdx && PROJECTS[i]) { lastViewIdx = i; viewBtn.textContent = `View ${PROJECTS[i].client} ↗`; }
   } else { lastViewIdx = -2; }
 }
 
@@ -775,6 +795,7 @@ window.__setParam = (key, v) => {
 };
 window.__openDetail = openProject;
 window.__closeDetail = closeDetail;
+window.__about = about;
 window.__audio = audio;
 window.__state = state;
 window.__vel = () => userVel;

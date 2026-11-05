@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IAAH · Type comps · Helvetica Neue</title>
+<link rel="stylesheet" href="../../css/site.css?v=36">
+<link rel="stylesheet" href="../_comps.css?v=36">
+</head>
+<body>
+<div class="page">
+  <h1>IAAH · type comps · Helvetica Neue</h1>
+  <p class="lede">Four treatments of the same chrome and the same write-up, all Helvetica Neue. Each is a set of tokens, so the live site takes any of them with <code>?type=a</code> … <code>?type=d</code>. B is what ships unless you say otherwise: the studies' tokens, 13/1.45, a 60-character measure. Left: the landing with the project card; right: the write-up on the sheet. <a href="../grow/">Grow comps →</a></p>
+
+  <div id="secs"></div>
+</div>
+
+<script type="module">
+import { initAbout } from '../../js/about.js?v=36';
+const T = [
+  ['a', 'Tracked caps', 'The mono’s voice kept, in Helvetica: 11 px medium caps tracked .1em for the chrome; a 12 px body tracked .03em on a 56-character measure. Closest to the site as it stands.', 'content/iaah/katla/00.jpg', 'KATLA'],
+  ['b', 'Selects', 'The studies’ tokens. 11 px medium caps, lightly tracked, for the chrome; 13 px regular, sentence case, 1.45 line height, a 60-character measure for the write-up and the project card. The default.', 'content/iaah/queens-gambit/00.jpg', 'QUEENS GAMBIT'],
+  ['c', 'One size', 'Everything 13 px regular, sentence case, no tracking: the chrome and the write-up are the same voice. The most Helvetica thing to do; the buttons read as words, not labels.', 'content/iaah/griselda/00.jpg', 'GRISELDA'],
+  ['d', 'Large light', 'A 20 px light write-up on a 42-character measure (17 px on a phone); the chrome 12 px medium, sentence case. The paragraph becomes the page.', 'content/iaah/grand-army/00.jpg', 'GRAND ARMY'],
+];
+const DESC = {
+  'KATLA': ['Design', 2021, 'We developed the identity on Katla, a Netflix series that was centered on the active volcano Katla, in Iceland. Katla is an Icelandic mystery-drama series created by Baltasar Kormákur and Sigurjón Kjartansson.'],
+  'QUEENS GAMBIT': ['Identity development', 2020, 'Developed the identity for the break out hit "The Queen\'s Gambit" which follows the remarkable journey of Beth Harmon, a young orphaned chess prodigy, as she rises through the ranks of competitive chess in the 1950s and 1960s.'],
+  'GRISELDA': ['Main and Teaser Keyart', 2024, 'We partnered with Netflix to help develop and roll out a full campaign aimed at teasing the provocative subject matter at the heart of Griselda. The Queen Pin of Cocaine in the 70\'s-80\'s Miami.'],
+  'GRAND ARMY': ['Design', 2019, 'A powerful series that debuted on Netflix in 2020. We developed a series of marks and identities that we were very proud of that encapsulate New York and student life in a symbiotic nature.'],
+};
+const secs = document.getElementById('secs');
+function chrome(which) {
+  return `<img class="still" src="../../${which}" alt="">
+  <div class="overlay">
+    <button class="metro"><span>IAAH</span></button>
+    <button class="about-btn">About</button>
+    <button class="index-btn">Works</button>
+  </div>`;
+}
+T.forEach(([k, name, note, still, client]) => {
+  const sec = document.createElement('div'); sec.className = 'sec';
+  sec.innerHTML = `<h2><b>${k.toUpperCase()}</b>${name}</h2><p class="note">${note} · <a class="live" href="../../?type=${k}&intro=0" target="_blank">see it live</a></p>
+  <div class="grid">
+    <figure><div class="frame" data-type="${k}">${chrome(still)}</div>
+      <figcaption>The landing, with the project card as it reads inside a project.</figcaption></figure>
+    <figure><div class="frame" data-type="${k}">${chrome(still)}</div>
+      <figcaption>The write-up on the sheet. Click the mark to close and open it.</figcaption></figure>
+  </div>`;
+  secs.appendChild(sec);
+  const [f1, f2] = sec.querySelectorAll('.frame');
+  const ov1 = f1.querySelector('.overlay');
+  ov1.insertAdjacentHTML('beforeend', `<div class="detail"><button class="detail-x">&#10005;</button>
+    <div class="detail-meta">01 · ${client} — ${DESC[client][0]} · ${DESC[client][1]}</div>
+    <p class="detail-desc">${DESC[client][2]}</p></div>
+    <button class="view-btn">View ${client} ↗</button>`);
+  const ov2 = f2.querySelector('.overlay');
+  const a = initAbout({ host: ov2, mark: ov2.querySelector('.metro'), variant: 'square' });
+  requestAnimationFrame(() => { a.open(true); f2.classList.add('about-open'); });
+  ov2.querySelector('.metro').addEventListener('click', () => { a.toggle(); f2.classList.toggle('about-open', a.isOpen()); });
+});
+</script>
+</body>
+</html>
