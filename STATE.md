@@ -1,6 +1,19 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.44 — the IAAH launch build, on lab as FOVEA V.2**
+_Last updated: 2026-11-05_ · **V.45 — the IAAH launch build, on lab as FOVEA V.2**
+
+V.45: the × is drawn as two hairlines (centred to the pixel) and fades and settles in when a project
+opens, instead of popping.
+
+**The domain, as found on 5 Nov 2026 (not yet moved):** iamalwayshungry.com's authoritative DNS is Media
+Temple (ns1/ns2.mediatemple.net; registrar GoDaddy), not Cloudflare — the Cloudflare zone 4ae077f7… is a
+partial setup that only carries the subdomains (lab, archive, riftbound point at pages.dev). The apex
+and www resolve to Netlify (75.2.60.5, antinomy-iaah.netlify.app), which serves the old Nuxt site. Two
+ways to go live on the domain, both Ness's to unlock: (a) deploy this build to that Netlify site, no
+DNS change; (b) at Media Temple set the apex A records to GitHub Pages (185.199.108.153, .109.153,
+.110.153, .111.153) and www CNAME to nessim-higson.github.io, then add a `CNAME` file here and enforce
+HTTPS. Do NOT add the CNAME file before DNS points at GitHub: it would redirect the github.io URL to the
+Netlify site.
 
 V.44: inside a project the scrim is shorter (36vh, 340px at most) and the copy sits lower and further
 in (56 px from the left on a laptop, 36 on a phone).
