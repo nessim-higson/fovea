@@ -93,8 +93,15 @@ html.intro .overlay > * { pointer-events: none; }
 
 /* top-right: Close (inside a project) · Works */
 .top { position: absolute; right: var(--sr); top: var(--st); display: flex; gap: 4px; }
-.detail-x[hidden] { display: none; }
-.detail-x, .wb-close { width: 32px; padding: 0; border-radius: 50%; font-size: 15px; font-weight: 300; }
+/* the ×: two hairlines, so it is centred to the pixel; it fades and settles in when a project opens */
+.detail-x, .wb-close { position: relative; width: 32px; padding: 0; border-radius: 50%; font-size: 0; }
+.detail-x::before, .detail-x::after, .wb-close::before, .wb-close::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 11px; height: 1px; background: currentColor;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.detail-x::after, .wb-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
+.detail-x { opacity: 0; transform: scale(.7); pointer-events: none; transition: opacity .5s var(--ease), transform .5s var(--ease), color .45s ease-out, border-color .45s ease-out; }
+.detail-x.show { opacity: 1; transform: scale(1); pointer-events: auto; }
 @media (max-width: 759px) { .detail-x, .wb-close { width: 40px; } }
 /* Sound sits in the top row with Works; a 6 px square marks it on */
 .sound-btn.on::before { content: ''; width: 6px; height: 6px; margin-right: 8px; background: currentColor; }

@@ -15,14 +15,14 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=44';
-import { initAbout } from './about.js?v=44';
+import { initWorksBed } from './worksbed.js?v=45';
+import { initAbout } from './about.js?v=45';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=44'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=45'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -643,7 +643,7 @@ function mountCase(i) {
   detailIdx = i;
   casePinTop = false;   // armed only after the snap below, so the build re-flow is quiet
   populateCard(i);
-  detailEl.hidden = false; detailX.hidden = false;
+  detailEl.hidden = false; detailX.classList.add('show');
   document.body.classList.add('in-project');
 
   const t = buildCaseTrack(i);   // just this project's images
@@ -704,7 +704,7 @@ function closeDetail() {
   fadeSwap(() => {
     detailOpen = false;
     detailIdx = -1;
-    detailEl.hidden = true; detailX.hidden = true;
+    detailEl.hidden = true; detailX.classList.remove('show');
     document.body.classList.remove('in-project');
 
     disposeCaseTrack();
