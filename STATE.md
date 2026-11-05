@@ -1,6 +1,10 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.51 — LIVE on https://iamalwayshungry.com**
+_Last updated: 2026-11-05_ · **V.52 — LIVE on https://iamalwayshungry.com**
+
+V.52: the phone's first-drag blip — the loop's unit is VH, so when the address bar folds away on the first
+drag (height grows, `layout()` re-runs) the same scrollY landed on a different project. `layout()` now
+scales the scroll position and `smooth` by the height ratio, so the place in the loop is kept.
 
 V.51: the drop slower, with its ease-in — a spring from rest (ζ .72, ω 8, 1.5 s) is the default; `?drop=quick`
 (ω 11, 1.2 s), `slow` (ω 6.5, 1.8 s), `slower` (ω 5.5, 2.1 s) to compare. The type starts at 42 % of the drop.

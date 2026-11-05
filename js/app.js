@@ -15,14 +15,14 @@ import GUI from 'lil-gui';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=51';
-import { initAbout } from './about.js?v=51';
+import { initWorksBed } from './worksbed.js?v=52';
+import { initAbout } from './about.js?v=52';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=51'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=52'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -441,6 +441,7 @@ function layout() {
     h = Math.max(VH, h);
     if (h === VH) return;
   }
+  const oldVH = VH;
   VW = w; VH = h;
   renderer.setSize(VW, VH);
   const pr = renderer.getPixelRatio();
@@ -458,6 +459,14 @@ function layout() {
   spacer.style.height = detailOpen && caseTrack
     ? (CASE_LOOPS * caseTrack.trackH) + 'px'
     : (LOOPS * cycleH()) + 'px';
+  // the loop's unit is the viewport height, so a height change (a phone's address bar
+  // folding away on the first drag) used to move the scroll onto a different project —
+  // the blip. Keep the same place in the loop by scaling the scroll with the height (V.52).
+  if (oldVH && h !== oldVH && !(detailOpen && caseTrack)) {
+    const r = h / oldVH, y = window.scrollY * r;
+    window.scrollTo(0, y);
+    smooth *= r; lastSmooth = smooth; prevY = y; userVel = 0;
+  }
 }
 layout();
 window.addEventListener('resize', layout);
@@ -850,6 +859,8 @@ window.__setParam = (key, v) => {
 window.__openDetail = openProject;
 window.__closeDetail = closeDetail;
 window.__about = about;
+window.__vh = () => [VW, VH, smooth, window.scrollY];   // for checks: the layout's idea of the viewport and the loop position
+window.__layout = layout;
 window.__audio = audio;
 window.__state = state;
 window.__vel = () => userVel;
