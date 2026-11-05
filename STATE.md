@@ -1,6 +1,10 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.42 — the IAAH launch build, on lab as FOVEA V.2**
+_Last updated: 2026-11-05_ · **V.43 — the IAAH launch build, on lab as FOVEA V.2**
+
+V.43: the write-up is set exactly as study B1 sets it — one paragraph, then `Contact:` in ink with the
+address in mute; the Instagram line is Ness's own name, @nessimhigson (confirmed by Ness). Close is an
+× in a round pill, in a project and on the bed.
 
 V.42: the mark is 67 px (53 on a phone), its word 13 px like the site's type; the title word under the
 landing and the bed's caption lose their hairline (the word alone).

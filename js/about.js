@@ -12,15 +12,12 @@
 // ═══════════════════════════════════════════════════════════════════
 
 export const ABOUT = {
-  // the studio write-up from iaah.work, verbatim; only the returns are new
+  // the studio write-up from iaah.work, verbatim, as one paragraph — set as tempo study B1 sets it (Ness, 5 Nov 2026)
   lines: [
-    'Realization often comes in the most unexpected ways.',
-    'We are an independent design studio focused on branding, visual identity, creative direction, print, title sequences, animation, interactive, etc.',
-    'We have developed a network of creatives that span a variety of disciplines in which we partner to meet the specific needs of any project.',
-    'Intentionally small, truly global with an intent to create the highest level of excellence in our work.',
+    'Realization often comes in the most unexpected ways. We are an independent design studio focused on branding, visual identity, creative direction, print, title sequences, animation, interactive, etc. We have developed a network of creatives that span a variety of disciplines in which we partner to meet the specific needs of any project. Intentionally small, truly global with an intent to create the highest level of excellence in our work.',
   ],
   mail: 'ness@iamalwayshungry.com',
-  instagram: 'iamalwayshungry',
+  instagram: 'nessimhigson',
 };
 
 export const GROWS = ['square', 'circle', 'wipe', 'turn', 'scrim'];

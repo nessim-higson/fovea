@@ -94,6 +94,8 @@ html.intro .overlay > * { pointer-events: none; }
 /* top-right: Close (inside a project) · Works */
 .top { position: absolute; right: var(--sr); top: var(--st); display: flex; gap: 4px; }
 .detail-x[hidden] { display: none; }
+.detail-x, .wb-close { width: 32px; padding: 0; border-radius: 50%; font-size: 15px; font-weight: 300; }
+@media (max-width: 759px) { .detail-x, .wb-close { width: 40px; } }
 /* Sound sits in the top row with Works; a 6 px square marks it on */
 .sound-btn.on::before { content: ''; width: 6px; height: 6px; margin-right: 8px; background: currentColor; }
 /* View — dive into the project in view, straight from the landing — bottom centre */
@@ -133,7 +135,7 @@ html.intro .overlay > * { pointer-events: none; }
 }
 .about-info p { margin: 0; max-width: 60ch; }
 .about-info p + p { margin-top: 1em; }
-.about-info .ct { margin-top: 1.4em; color: var(--mute); }
+.about-info .ct { margin-top: 1.4em; color: var(--ink); }   /* the label in ink, the address in mute, as the study */
 .about-info .ct a { color: var(--mute); }
 .about-info .ct a:hover { color: var(--ink); }
 .about-info .ln { opacity: 0; will-change: transform, opacity; }
