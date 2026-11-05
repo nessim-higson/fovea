@@ -23,6 +23,16 @@ export const ABOUT = {
 export const GROWS = ['square', 'circle', 'wipe', 'turn', 'scrim'];
 export const EXITS = ['reverse', 'fade', 'lift', 'sweep', 'turn'];
 const EASE = 'cubic-bezier(.65,0,.35,1)';
+const EXPO = 'cubic-bezier(.16,1,.3,1)';
+// a spring as a linear() easing (from the tempo studies' stage): ζ damping, ω rad/s, settled by T s
+function spring(z, w, T, n = 80) {
+  const pts = [], wd = w * Math.sqrt(1 - z * z);
+  for (let i = 0; i <= n; i++) { const t = i / n * T; pts.push((1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + (z * w / wd) * Math.sin(wd * t))).toFixed(4)); }
+  pts[n] = '1';
+  return 'linear(' + pts.join(',') + ')';
+}
+// the drop's landing: a fast fall that settles with a 4 % overshoot (hidden by the sheet's headroom); browsers without linear() get the expo
+const DROP = (typeof CSS !== 'undefined' && CSS.supports && CSS.supports('animation-timing-function', 'linear(0, 1)')) ? spring(.72, 13, 1.1) : EXPO;
 
 export function initAbout({ host, mark, variant = 'square', exit = 'reverse', onOpen, onClose }) {
   if (!GROWS.includes(variant)) variant = 'square';
@@ -58,12 +68,12 @@ export function initAbout({ host, mark, variant = 'square', exit = 'reverse', on
     const g = geo();
     sheet.classList.toggle('full', variant === 'circle' || variant === 'wipe' || variant === 'scrim');
     if (variant === 'square') {
-      sheet.style.width = sheet.style.height = g.ms + 'px'; sheet.style.transformOrigin = '0 0';
+      sheet.style.top = ''; sheet.style.width = sheet.style.height = g.ms + 'px'; sheet.style.transformOrigin = '0 0';
       return { from: { transform: `translate(${g.mx}px,${g.my}px) scale(1)` },
                to:   { transform: `translate(${g.cx - g.side / 2}px,${g.cy - g.side / 2}px) scale(${g.side / g.ms})` }, ms: 1100 };
     }
     if (variant === 'turn') {
-      sheet.style.width = sheet.style.height = g.ms + 'px'; sheet.style.transformOrigin = 'center';
+      sheet.style.top = ''; sheet.style.width = sheet.style.height = g.ms + 'px'; sheet.style.transformOrigin = 'center';
       return { from: { transform: `translate(${g.mx}px,${g.my}px) rotate(0deg) scale(1)` },
                to:   { transform: `translate(${g.cx - g.ms / 2}px,${g.cy - g.ms / 2}px) rotate(90deg) scale(${g.diag / g.ms})` }, ms: 1300 };
     }
@@ -72,9 +82,11 @@ export function initAbout({ host, mark, variant = 'square', exit = 'reverse', on
       return { from: { clipPath: `circle(${g.ms / 2}px at ${g.mcx}px ${g.mcy}px)` },
                to:   { clipPath: `circle(${R}px at ${g.mcx}px ${g.mcy}px)` }, ms: 1000 };
     }
-    if (variant === 'wipe') {
-      return { from: { clipPath: 'inset(0 0 100% 0)' }, to: { clipPath: 'inset(0 0 0 0)' }, ms: 900 };
+    if (variant === 'wipe') {   // the drop: the sheet falls in from above and lands on a spring. 20 % headroom hides the overshoot
+      sheet.style.top = '-20%'; sheet.style.height = '120%'; sheet.style.transformOrigin = '';
+      return { from: { transform: 'translateY(-100%)' }, to: { transform: 'translateY(0)' }, ms: 1100, ease: DROP, at: 380 };
     }
+    sheet.style.top = ''; sheet.style.height = '';
     return { from: { opacity: 0 }, to: { opacity: 1 }, ms: 800 };   // scrim
   }
   function rest() {
@@ -86,10 +98,10 @@ export function initAbout({ host, mark, variant = 'square', exit = 'reverse', on
   }
   rest();
 
-  function rise(at) {
+  function rise(at, ease = EASE) {
     info.querySelectorAll('.ln').forEach((l, k) => {
       l.style.opacity = 0;
-      anim(l, [{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 700, delay: at + k * 80, easing: EASE, fill: 'forwards' });
+      anim(l, [{ opacity: 0, transform: 'translateY(14px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 800, delay: at + k * 80, easing: ease, fill: 'forwards' });
     });
   }
   function fall(ms) {
@@ -105,8 +117,8 @@ export function initAbout({ host, mark, variant = 'square', exit = 'reverse', on
     if (instant) {
       Object.assign(sheet.style, s.to); info.querySelectorAll('.ln').forEach(l => { l.style.opacity = 1; });
     } else {
-      anim(sheet, [s.from, s.to], { duration: s.ms, easing: EASE, fill: 'forwards' });
-      rise(variant === 'scrim' ? 300 : 520);
+      anim(sheet, [s.from, s.to], { duration: s.ms, easing: s.ease || EASE, fill: 'forwards' });
+      rise(s.at != null ? s.at : (variant === 'scrim' ? 300 : 520), s.ease ? EXPO : EASE);
     }
     if (onOpen) onOpen();
   }

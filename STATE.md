@@ -1,6 +1,11 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.49 — LIVE on https://iamalwayshungry.com**
+_Last updated: 2026-11-05_ · **V.50 — LIVE on https://iamalwayshungry.com**
+
+V.50: the write-up's sheet drops in from the top (`variant: 'wipe'` is now a translateY drop, the default):
+1.1 s on a spring (ζ .72, ω 13, as a `linear()` easing from the studies' `spring()`; expo where
+`linear()` is unsupported), a 4 % overshoot hidden by 20 % headroom above the sheet; the type rises on the
+expo from 380 ms as the sheet lands. The exit stays the fade.
 
 V.49: the phone's load lag — a phone now renders at 1.25× (was 1.5), loads one cover at a time (desktop
 three), decodes each image off the main thread (`img.decode()`) before the canvas scale, caps covers at
