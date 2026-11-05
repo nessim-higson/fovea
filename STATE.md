@@ -1,6 +1,17 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-05_ · **V.45 — the IAAH launch build, on lab as FOVEA V.2**
+_Last updated: 2026-11-05_ · **V.45 — LIVE on https://iamalwayshungry.com**
+
+**The domain moved on 5 Nov 2026 (afternoon).** DNS stayed at Media Temple, edited through GoDaddy's DNS
+page for the domain (dcc.godaddy.com → Portfolio → iamalwayshungry.com → DNS): the apex A record went
+from Netlify (75.2.60.5) to GitHub Pages' four addresses (185.199.108–111.153), `www` from
+antinomy-iaah.netlify.app to `nessim-higson.github.io`. Mail (Google Workspace MX ×7) untouched. The
+custom domain is set on the Pages site (`CNAME` file in the repo, committed by GitHub). GitHub only
+started the certificate after the domain was removed and re-added (`PUT …/pages {"cname":null}` then
+`-f cname=iamalwayshungry.com`); it covers apex + www, expires 2027-02-03, renews itself. **Enforce
+HTTPS** is the remaining toggle (`gh api -X PUT repos/nessim-higson/fovea/pages -F https_enforced=true`).
+nessim-higson.github.io/fovea now redirects to the domain; lab…/s/fovea-v2 is a separate copy and
+stays. The old Netlify site is untouched in its own account, reachable only by its netlify.app URL.
 
 V.45: the × is drawn as two hairlines (centred to the pixel) and fades and settles in when a project
 opens, instead of popping.
