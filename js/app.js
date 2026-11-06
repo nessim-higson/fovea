@@ -14,14 +14,14 @@ import * as THREE from 'three';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=56';
-import { initAbout } from './about.js?v=56';
+import { initWorksBed } from './worksbed.js?v=57';
+import { initAbout } from './about.js?v=57';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=56'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=57'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -46,7 +46,7 @@ const renderer = new THREE.WebGLRenderer({
   canvas: document.getElementById('gl'), antialias: false,   // a full-screen quad: multisampling buys nothing and costs a phone dearly (V.55)
   depth: false, stencil: false, powerPreference: 'high-performance',
 });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, COARSE ? 1 : 2));   // a phone renders at 1× (V.56): the lens is soft by nature, and fill rate is the phone's limit
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, COARSE ? 1 : 2));   // a phone renders at 1× (V.57): the lens is soft by nature, and fill rate is the phone's limit
 
 let VW = 0, VH = 0;   // set by layout() (which runs immediately below)
 
@@ -515,7 +515,7 @@ window.scrollTo(0, Math.floor(LOOPS / 2) * cycleH() + START * VH);
 
 let smooth = window.scrollY, lastSmooth = smooth, scrollDif = 0;
 // on a phone the auto-drift no longer scrolls the window (Safari does real work on every
-// programmatic scroll); it is an offset added to the scroll instead (V.56)
+// programmatic scroll); it is an offset added to the scroll instead (V.57)
 let driftPx = 0;
 // velocity that drives the distortion is computed from USER scroll only —
 // the auto-drift is subtracted out (see frame loop), so auto-playing
@@ -602,7 +602,7 @@ function turnMetro(deg = 90, ms = 1500) {
    drift pauses while it is up and resumes after. ?about=square|circle|wipe|turn|scrim */
 const QS = new URLSearchParams(location.search);
 const about = initAbout({
-  host: document.getElementById('about-host'),   // its own layer above the Works bed (V.56)
+  host: document.getElementById('about-host'),   // its own layer above the Works bed (V.57)
   mark: metroEl,
   variant: QS.get('about') || 'wipe',      // how the sheet comes in — the drop from the top, on a spring (Ness, V.50)
   exit: QS.get('out') || 'fade',           // how it goes out (?out=reverse|fade|lift|sweep|turn) — fade, Ness's pick

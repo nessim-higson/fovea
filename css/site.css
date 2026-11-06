@@ -161,11 +161,11 @@ html.intro .metro { opacity: 0; pointer-events: none; }
   opacity: 0; transition: opacity .6s ease-out;
 }
 body.in-project .scrim { opacity: 1; }
-.detail { position: absolute; left: calc(var(--sl) + 32px); bottom: calc(var(--sb) + 4px); max-width: 44ch; font-size: 11px; line-height: 1.45; color: var(--mute); }
+.detail { position: absolute; left: calc(var(--sl) + 32px); bottom: calc(var(--sb) + 36px); max-width: 44ch; font-size: 11px; line-height: 1.45; color: var(--mute); }   /* 56 px from the left and from the bottom alike */
 .detail[hidden] { display: none; }
 .detail-meta { display: block; font-weight: 500; color: var(--ink); }
 .detail-desc { margin-top: 0; }
-@media (max-width: 759px) { .detail { left: calc(var(--sl) + 20px); right: calc(var(--sr) + 20px); max-width: none; bottom: calc(var(--sb) + 8px); } }
+@media (max-width: 759px) { .detail { left: calc(var(--sl) + 20px); right: calc(var(--sr) + 20px); max-width: none; bottom: calc(var(--sb) + 20px); } }   /* 36 px alike on a phone */
 
 /* the rest of the controls stay hidden on the public site (V.36); the keyboard still works (G — effects panel) */
 .lens-btn, .hint, .version, .beat-dot { display: none; }
