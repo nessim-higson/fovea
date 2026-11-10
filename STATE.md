@@ -1,6 +1,12 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-10_ · **V.58 — LIVE on https://iamalwayshungry.com**
+_Last updated: 2026-11-10_ · **V.59 — LIVE on https://iamalwayshungry.com**
+
+**V.59 — batch two is live (10 Nov 2026).** Six more from the Apple material, on Ness's word: The Arena
+(13 plates, 5 films), East of Eden (his September cut: six material tests, two placements), Little House on
+the Prairie, Kill Current (all 2026), Black Rabbit and Stranger Things (2025). 34 projects in all. Placement
+shots in East of Eden and Little House are generated studies. Left out: the deck's outcome lines, the Fatal
+Fury IP board, key art comps with placeholder billing, low-resolution title tests.
 
 **V.58 — recent work is live (10 Nov 2026).** Four projects built from the Apple credentials material
 (`prototypes/apple-creds`, a private repo) by `tools/stage_next.py`, at the head of the list: Ani-May (2026,
