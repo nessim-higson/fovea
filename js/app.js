@@ -14,14 +14,14 @@ import * as THREE from 'three';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=57';
-import { initAbout } from './about.js?v=57';
+import { initWorksBed } from './worksbed.js?v=58';
+import { initAbout } from './about.js?v=58';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=57'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=58'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -138,7 +138,7 @@ function loadMedia(src, holder, done = () => {}) {
     const pImg = new Image(); pImg.crossOrigin = 'anonymous';
     pImg.onload = () => {
       if (holder._videoLive) return;
-      const pt = new THREE.CanvasTexture(pImg); pt.colorSpace = THREE.SRGBColorSpace;
+      const pt = new THREE.CanvasTexture(pImg);   // no colour space tag: see TRUE COLOUR below
       holder.mat.uniforms.map.value = pt;
       holder.imgW = pImg.naturalWidth; holder.imgH = pImg.naturalHeight; holder.fit();
     };
@@ -159,7 +159,6 @@ function loadMedia(src, holder, done = () => {}) {
       holder.imgW = v.videoWidth || 16;
       holder.imgH = v.videoHeight || 9;
       const t = new THREE.VideoTexture(v);
-      t.colorSpace = THREE.SRGBColorSpace;
       holder.mat.uniforms.map.value = t;
       holder.fit();
       v.play().catch(() => {});
@@ -182,7 +181,6 @@ function loadMedia(src, holder, done = () => {}) {
       c.getContext('2d').drawImage(img, 0, 0, w, h);
       holder.lum = lumGrid(c);   // 3×3 luminance, for the nav's colour on a phone (no GPU readback)
       const t = new THREE.CanvasTexture(c);
-      t.colorSpace = THREE.SRGBColorSpace;
       holder.mat.uniforms.map.value = t;
       holder.imgW = nw; holder.imgH = nh; holder.fit();
       holder.landed = performance.now();   // fades up from black over 500 ms (the frame loop)
@@ -282,7 +280,11 @@ const CASE_LOOPS = 4;
 // while a project is freshly mounted and untouched, keep its first image
 // pinned to the top so the arrival never appears to "scroll to find" it.
 let casePinTop = false;
-const DETAIL_LIFT = 1.22;   // exposure lift for in-project images (they read dark otherwise)
+// TRUE COLOUR (V.58): textures carry no colour-space tag, so their sRGB values pass through both
+// passes untouched and reach the screen as authored. Until V.57 they were tagged sRGB, decoded to
+// linear on sampling and never encoded back: everything showed darker and more saturated than the
+// source (Crunchyroll's orange came out red). The 1.22 lift below was compensating for that.
+const DETAIL_LIFT = 1.0;   // was 1.22 while the colour pipeline darkened everything
 
 function makeSlideMaterial(texture) {
   return new THREE.ShaderMaterial({

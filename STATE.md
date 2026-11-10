@@ -1,16 +1,19 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-10_ · **V.56 — LIVE on https://iamalwayshungry.com**
+_Last updated: 2026-11-10_ · **V.58 — LIVE on https://iamalwayshungry.com**
 
-**New work, staged locally, not live (10 Nov 2026).** Ness asked to start populating the site with recent
-work, Crunchyroll and Criterion first, from the Apple credentials site (`prototypes/apple-creds`, a private
-repo). Four projects are proposed: Ani-May (2026), Sorcerer (2025), The Criterion Collection (2025, replacing
-the six-render one) and Crunchyroll (2024). `tools/stage_next.py` builds them into `next/content/<slug>/`
-with `js/config-next.js` and a plan sheet per project (`next/sheet-<slug>.jpg`); preview at
-`http://127.0.0.1:4188/?set=next&intro=0`. All of that is git-excluded on the laptop (`.git/info/exclude`)
-because this repo is public: nothing is committed until Ness approves the picks. Going live = move
-`next/content/*` to `content/iaah/`, add the four entries to `js/config-iaah.js`, extend `#covers` in
-`index.html`.
+**V.58 — recent work is live (10 Nov 2026).** Four projects built from the Apple credentials material
+(`prototypes/apple-creds`, a private repo) by `tools/stage_next.py`, at the head of the list: Ani-May (2026,
+19 plates, 3 films), Sorcerer (2025), The Criterion Collection (2025, 16 plates, 2 films; it replaces the
+six-render entry, whose folder stays for the frozen snapshots) and Crunchyroll (2024, 20 plates, 2 films).
+Portrait work is composed into landscape plates (covers in pairs, posters in threes). Third-party material was
+left out (a collector's unboxing reel, watermarked box photos, Criterion's product shots, manga reference
+pages, Crunchyroll's own trailer) and so were the deck's unconfirmed outcome claims. To add more: add a project
+to the script, run it, paste its entry from `next/projects.json` into `js/config-iaah.js`, regenerate `#covers`.
+
+**True colour (V.58).** Textures no longer carry `SRGBColorSpace`: they were decoded to linear on sampling and
+never encoded back, so the whole site showed darker and more saturated than the sources (Crunchyroll's orange
+read red). Values now pass through untouched; `DETAIL_LIFT` is 1.0 (the 1.22 lift was compensating).
 
 V.56 (more phone work): the auto-drift on touch is an offset (`driftPx`) added to the scroll instead of a
 `scrollBy` every frame (Safari does real work on each programmatic scroll); the drift resets wherever the
