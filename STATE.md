@@ -1,6 +1,16 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-06_ · **V.56 — LIVE on https://iamalwayshungry.com**
+_Last updated: 2026-11-10_ · **V.56 — LIVE on https://iamalwayshungry.com**
+
+**New work, staged locally, not live (10 Nov 2026).** Ness asked to start populating the site with recent
+work, Crunchyroll and Criterion first, from the Apple credentials site (`prototypes/apple-creds`, a private
+repo). Four projects are proposed: Ani-May (2026), Sorcerer (2025), The Criterion Collection (2025, replacing
+the six-render one) and Crunchyroll (2024). `tools/stage_next.py` builds them into `next/content/<slug>/`
+with `js/config-next.js` and a plan sheet per project (`next/sheet-<slug>.jpg`); preview at
+`http://127.0.0.1:4188/?set=next&intro=0`. All of that is git-excluded on the laptop (`.git/info/exclude`)
+because this repo is public: nothing is committed until Ness approves the picks. Going live = move
+`next/content/*` to `content/iaah/`, add the four entries to `js/config-iaah.js`, extend `#covers` in
+`index.html`.
 
 V.56 (more phone work): the auto-drift on touch is an offset (`driftPx`) added to the scroll instead of a
 `scrollBy` every frame (Safari does real work on each programmatic scroll); the drift resets wherever the
