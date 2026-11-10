@@ -13,6 +13,7 @@
   'use strict';
   var q = new URLSearchParams(location.search);
 
+  try { history.scrollRestoration = 'manual'; } catch (e) {}   /* a reload must not land where the last visit was */
   var resolve, done = new Promise(function (r) { resolve = r; });
   window.__intro = done;
   /* the landing project is chosen here, not in app.js, so its cover (the 1400 px WebP) starts

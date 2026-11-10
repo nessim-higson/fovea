@@ -14,14 +14,14 @@ import * as THREE from 'three';
 import { makePoster, makeGallery } from './posters.js';
 import { EFFECTS, VERTEX } from './effects.js';
 import { createAudioEngine } from './audio.js';
-import { initWorksBed } from './worksbed.js?v=59';
-import { initAbout } from './about.js?v=59';
+import { initWorksBed } from './worksbed.js?v=60';
+import { initAbout } from './about.js?v=60';
 
 // content sets: ?set=<name> loads js/config-<name>.js. Default is IAAH (the
 // portfolio); ?set=fovea / ?set=uniqlock load the FOVEA demo content.
 const CONTENT_SET = new URLSearchParams(location.search).get('set');
 const { SITE, PROJECTS, SETTINGS } = await import(
-  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=59'
+  (CONTENT_SET ? `./config-${CONTENT_SET}.js` : './config-iaah.js') + '?v=60'
 );
 const COARSE = matchMedia('(pointer: coarse)').matches;   // mobile / touch device
 
@@ -491,20 +491,35 @@ function layout() {
   // the loop's unit is the viewport height, so a height change (a phone's address bar
   // folding away on the first drag) used to move the scroll onto a different project —
   // the blip. Keep the same place in the loop by scaling the scroll with the height (V.52).
-  if (oldVH && h !== oldVH && !(detailOpen && caseTrack)) {
+  if (!startPlaced && typeof placeStart === 'function' && typeof START !== 'undefined') placeStart();
+  else if (oldVH && h !== oldVH && !(detailOpen && caseTrack)) {
     const r = h / oldVH, y = window.scrollY * r;
     window.scrollTo(0, y);
     smooth *= r; lastSmooth = smooth; prevY = y; userVel = 0;
   }
 }
-layout();
-window.addEventListener('resize', layout);
 // land on a different project each visit (V.46): the loop is seamless, so any
 // start is as good as the first. ?start=<n> pins one for checks.
 const START = (() => { if (window.__start != null && PROJECTS[window.__start]) return window.__start;   // chosen by the opening, cover already on its way
   const q = new URLSearchParams(location.search).get('start');
   return q != null && PROJECTS[+q] ? +q : Math.floor(Math.random() * PROJECTS.length); })();
-window.scrollTo(0, Math.floor(LOOPS / 2) * cycleH() + START * VH);
+// V.60: the browser must not put the page back where it was on a reload (that landed every
+// reload on the same project), and the start is placed the first time the viewport has a real
+// size (a zero-size first layout used to leave it on project 0).
+try { history.scrollRestoration = 'manual'; } catch (e) {}
+let startPlaced = false, loopVarsReady = false;
+function placeStart() {
+  if (startPlaced || !VH) return;
+  startPlaced = true;
+  const y = Math.floor(LOOPS / 2) * cycleH() + START * VH;
+  window.scrollTo(0, y);
+  if (loopVarsReady) { smooth = lastSmooth = prevY = y; userVel = 0; driftPx = 0; }
+}
+layout();
+window.addEventListener('resize', layout);
+placeStart();
+// some browsers restore the old scroll after load even so: put the start back once, if nothing has moved it on purpose
+window.addEventListener('pageshow', () => { if (!detailOpen && Math.abs(window.scrollY - (Math.floor(LOOPS / 2) * cycleH() + START * VH)) > VH * 2) { startPlaced = false; placeStart(); } }, { once: true });
 // load the covers nearest the landing first, then outward both ways round the loop
 { const n = PROJECTS.length;
   const ring = (from, to) => { for (let d = from; d <= to; d++) for (const i of d ? [(START + d) % n, (START - d + n) % n] : [START]) {
@@ -523,6 +538,7 @@ let driftPx = 0;
 // the auto-drift is subtracted out (see frame loop), so auto-playing
 // pages show clean, undistorted crops while manual scrolling still warps.
 let prevY = window.scrollY, userVel = 0;
+loopVarsReady = true;
 
 function rebase() {
   if (scrollAnim) return;    // don't teleport mid-glide

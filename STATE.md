@@ -1,6 +1,12 @@
 # FOVEA — STATE
 
-_Last updated: 2026-11-10_ · **V.59 — LIVE on https://iamalwayshungry.com**
+_Last updated: 2026-11-10_ · **V.60 — LIVE on https://iamalwayshungry.com**
+
+**V.60 — the random landing actually holds (10 Nov 2026).** The pick was always random, but a reload put
+the page back at the old scroll position (`history.scrollRestoration` was `auto`), so every reload landed on
+the same project. It is `manual` now (set in `intro.js` and `app.js`), the start is placed by `placeStart()`
+the first time the viewport has a real size (a zero-size first layout used to leave it on project 0), and a
+one-off `pageshow` check puts it back if the browser restores anyway.
 
 **`.nojekyll` (10 Nov 2026).** The Pages build no longer runs Jekyll: files are served as they are. Two
 reasons: Jekyll silently dropped `comps/_comps.css` (leading underscore, 404 on the domain), and the V.59
