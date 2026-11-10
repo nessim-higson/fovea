@@ -2,6 +2,10 @@
 
 _Last updated: 2026-11-10_ · **V.59 — LIVE on https://iamalwayshungry.com**
 
+**`.nojekyll` (10 Nov 2026).** The Pages build no longer runs Jekyll: files are served as they are. Two
+reasons: Jekyll silently dropped `comps/_comps.css` (leading underscore, 404 on the domain), and the V.59
+builds failed twice during a GitHub incident, so the lighter build has less to go wrong.
+
 **V.59 — batch two is live (10 Nov 2026).** Six more from the Apple material, on Ness's word: The Arena
 (13 plates, 5 films), East of Eden (his September cut: six material tests, two placements), Little House on
 the Prairie, Kill Current (all 2026), Black Rabbit and Stranger Things (2025). 34 projects in all. Placement
